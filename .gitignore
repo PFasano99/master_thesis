@@ -1,0 +1,17 @@
+#all the folders from other repositories are igonred but can be installed using the docker file
+chamferdist/
+concept-fusion/
+gradslam/
+PROCESSED/
+RAW/
+saved-feat/
+saved-map/
+
+#the dataset will be ignored as well
+/datasets
+
+#all archives will be ignored
+*.zip
+
+#my personal notes will be ignored
+note.md

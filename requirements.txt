@@ -1,0 +1,8 @@
+numpy
+matplotlib
+opencv-python
+open3d
+torch
+torchvision 
+tqdm
+tyro
