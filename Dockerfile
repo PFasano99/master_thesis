@@ -46,6 +46,9 @@ RUN pip install /home/paolo.fasano/tesi_image/gradslam/
 
 ENV PATH="/home/paolo.fasano/tesi_image/gradslam/:${PATH}"
 
+COPY ./concept-fusion ./concept-fusion
+COPY ./hl2-dump-c60 ./hl2-dump-c60
+
 CMD ["/bin/bash", "-c"] 
 # docker run -it --rm --name my-running-script -v "$PWD":/app my-python-app temp.py
 # podman image build -t Paolo.Fasano/tesi_image:v0.1 .
