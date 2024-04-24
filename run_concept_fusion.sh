@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#
+# 
 : '
     This shell script calls for the concept fusion scripts 
     to transform a set of images into a pointcloud and extract the features from it.
 '
 
-preset="" #cf-ds = concept fusion dataset | cnr-ds = CNR dataset | "" = custom | if left balank it will use cf-ds automatically
+preset="cnr-60" #cf-ds = concept fusion dataset | cnr-ds = CNR dataset | "" = custom | if left balank it will use cf-ds automatically
 
 #variables to run extract_conceptfusion_features.py
 data_dir=./datasets
@@ -99,9 +99,25 @@ if [[ "$preset" == "cf-ds" ]]; then
     map_save_dir=$data_dir/$sequence/saved-map
     image_height=120
     image_width=160 
-    desired_featureheight=120 
+    desired_feature_height=120 
     desired_feature_width=160
     device_ff=cuda
+
+elif [[ "$preset" == "cnr-60" ]]; then
+    data_dir=./build_depth/dataset
+    sequence=cnr_c60
+    checkpoint=./concept-fusion/examples/checkpoints/sam_vit_h_4b8939.pth
+    dataconfig_path=./build_depth/dataset/cnr_c60/dataconfigs/icl.yaml
+    device=cpu
+    save_dir=$data_dir/$sequence/saved-feat
+
+    mode=fusion
+    map_save_dir=$data_dir/$sequence/saved-map
+    image_height=1080
+    image_width=1920 
+    desired_feature_height=1080
+    desired_feature_width=1920
+    device_ff=cpu
 
 elif [[ "$preset" == "cnr-ds" ]]; then
     data_dir=./datasets/cnr
@@ -115,7 +131,7 @@ elif [[ "$preset" == "cnr-ds" ]]; then
     map_save_dir=$data_dir/$sequence/saved-map 
     image_height=288
     image_width=320   
-    desired_featureheight=288 
+    desired_feature_height=288 
     desired_feature_width=320
     device_ff=cuda
 elif [[ "$preset" == "cnr-ds-or" ]]; then
@@ -130,14 +146,14 @@ elif [[ "$preset" == "cnr-ds-or" ]]; then
     map_save_dir=$data_dir/$sequence/saved-map 
     image_height=760
     image_width=428   
-    desired_featureheight=760 
+    desired_feature_height=760 
     desired_feature_width=428
     device_ff=cuda
 fi
 
 echo "extract_conceptfusion_features.py will run with the following parameters:"
 echo -e " --data-dir $data_dir \n --sequence $sequence \n --checkpoint-path $checkpoint \n --dataconfig-path $dataconfig_path \n --save-dir $save_dir \n --device $device"
-python3 ./concept-fusion/examples/extract_conceptfusion_features.py --data-dir $data_dir --sequence $sequence --checkpoint-path $checkpoint --dataconfig-path $dataconfig_path --save-dir $save_dir  --device $device
+#python3 ./concept-fusion/examples/extract_conceptfusion_features.py --data-dir $data_dir --sequence $sequence --checkpoint-path $checkpoint --dataconfig-path $dataconfig_path --save-dir $save_dir  --device $device
 
 echo "run_feature_fusion_and_save_map.py will run with the following parameters"
 echo -e " --mode $mode \n --dataset-path $data_dir \n --sequence $sequence \n --dataconfig-path $dataconfig_path \n --device $device_ff \n --dir-to-save-map $map_save_dir \n --image-height $image_height \n --image-width $image_width \n --desired-feature-height $desired_feature_height \n --desired-feature-width $desired_feature_width \n --feat-dir $save_dir"
