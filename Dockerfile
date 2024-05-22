@@ -16,6 +16,9 @@ RUN apt-get update && \
                 libblas-dev \
                 libatlas-base-dev \
                 gcc \
+                g++ \
+                cmake \
+                make \
                 && rm -rf /var/lib/apt/lists/*
 
 
@@ -26,13 +29,13 @@ ENV CXX=g++
 ENV CXXFLAGS="-std=c++17"
 
 # Copy the requirements.txt file into the container at /app
-COPY ./requirements.txt /home/paolo.fasano/tesi_image/requirements.txt
-RUN pip3 install -r /home/paolo.fasano/tesi_image/requirements.txt
+COPY ./requirements.txt /tesi_image/requirements.txt
+RUN pip3 install -r /tesi_image/requirements.txt
 
 
-COPY ./gradslam /home/paolo.fasano/tesi_image/gradslam
-COPY ./HoloLens2ForCV /home/paolo.fasano/tesi_image/HoloLens2ForCv
-WORKDIR ./home/paolo.fasano/tesi_image
+COPY ./gradslam /tesi_image/gradslam
+COPY ./HoloLens2ForCV /tesi_image/HoloLens2ForCv
+WORKDIR /tesi_image
 
 # Install the package from the Git repository
 RUN pip install git+https://github.com/openai/CLIP.git
@@ -42,12 +45,11 @@ RUN pip install git+https://github.com/facebookresearch/segment-anything.git
 RUN pip install chamferdist
 RUN pip install open_clip_torch
 #RUN pip install git+https://github.com/gradslam/gradslam.git@conceptfusion
-RUN pip install /home/paolo.fasano/tesi_image/gradslam/
 
-ENV PATH="/home/paolo.fasano/tesi_image/gradslam/:${PATH}"
+#this line should be rewritten after fixing cpu and cuda use
+RUN pip install -e /tesi_image/gradslam/
 
-COPY ./concept-fusion ./concept-fusion
-COPY ./hl2-dump-c60 ./hl2-dump-c60
+ENV PATH="/tesi_image/gradslam/:${PATH}"
 
 CMD ["/bin/bash", "-c"] 
 # docker run -it --rm --name my-running-script -v "$PWD":/app my-python-app temp.py
