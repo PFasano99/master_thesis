@@ -113,25 +113,10 @@ elif [[ "$preset" == "cnr-60" ]]; then
 
     mode=fusion
     map_save_dir=$data_dir/$sequence/saved-map
-    image_height=720
-    image_width=1280 
-    desired_feature_height=720
-    desired_feature_width=1280
-    device_ff=cpu
-elif [[ "$preset" == "cnr-60-bis" ]]; then
-    data_dir=./datasets/cnr
-    sequence=hl2-dump-c60
-    checkpoint=./concept-fusion/examples/checkpoints/sam_vit_h_4b8939.pth
-    dataconfig_path=./build_depth/dataset/cnr_c60/dataconfigs/icl.yaml
-    device=cpu
-    save_dir=$data_dir/$sequence/saved-feat
-
-    mode=fusion
-    map_save_dir=$data_dir/$sequence/saved-map
-    image_height=288
-    image_width=320   
-    desired_feature_height=288 
-    desired_feature_width=320
+    image_height=1080
+    image_width=1920
+    desired_feature_height=1080
+    desired_feature_width=1920
     device_ff=cpu
 
 elif [[ "$preset" == "cnr-ds" ]]; then
@@ -166,7 +151,7 @@ elif [[ "$preset" == "cnr-ds-or" ]]; then
     device_ff=cuda
 fi
 
-threshold_mb=18500
+threshold_mb=1850
 
 while true; do
     echo "checking free memory"
@@ -187,7 +172,7 @@ while true; do
         
         echo "extract_conceptfusion_features.py will run with the following parameters:"
         echo -e " --data-dir $data_dir \n --sequence $sequence \n --checkpoint-path $checkpoint \n --dataconfig-path $dataconfig_path \n --save-dir $save_dir \n --device $device \n --desired-height $desired_feature_height \n --desired-width $desired_feature_width"
-        #python3 ./concept-fusion/examples/extract_conceptfusion_features.py --data-dir $data_dir --sequence $sequence --checkpoint-path $checkpoint --dataconfig-path $dataconfig_path --save-dir $save_dir  --device $device --desired-height $desired_feature_height --desired-width $desired_feature_width
+        python3 ./concept-fusion/examples/extract_conceptfusion_features.py --data-dir $data_dir --sequence $sequence --checkpoint-path $checkpoint --dataconfig-path $dataconfig_path --save-dir $save_dir  --device $device --desired-height $desired_feature_height --desired-width $desired_feature_width
    
         break  # Exit the loop once the condition is met
     fi
@@ -196,7 +181,7 @@ while true; do
     sleep 150
 done
 
-threshold_2_mb=15900
+threshold_2_mb=1590
 
 while true; do
     echo "checking free memory"
@@ -229,3 +214,9 @@ while true; do
     # Sleep for a few seconds before checking again (adjust as needed)
     sleep 150
 done
+
+load_path="./build_depth/dataset/cnr_c60/saved-map/pointclouds"
+
+echo "demo_text_query.py will run with the following parameters:"
+echo -e " --load-path $load_path"
+python3 ./concept-fusion/examples/demo_text_query.py --load-path $load_path

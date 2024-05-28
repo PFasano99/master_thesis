@@ -972,7 +972,7 @@ void make_yaml_file(string file_path, Eigen::Matrix3d intrinsic, string file_nam
         cerr << "Error: Unable to open file for writing! "<< file_path+file_name << endl;
     }
     else{
-        string element = "dataset_name: '"+dataset_name+"' \n camera_params: \n  image_height: "+std::to_string(image_height)+"\n  image_width: "+std::to_string(image_width)+"\n  fx: "+std::to_string(intrinsic(0,0))+"\n  fy: "+std::to_string(intrinsic(1,1))+"\n  cx: "+std::to_string(intrinsic(0,2))+"\n  cy: "+std::to_string(intrinsic(1,2))+"\n  png_depth_scale: "+std::to_string(png_depth_scale)+"\n  crop_edge: "+std::to_string(crop_edge);
+        string element = "dataset_name: '"+dataset_name+"' \ncamera_params: \n  image_height: "+std::to_string(image_height)+"\n  image_width: "+std::to_string(image_width)+"\n  fx: "+std::to_string(intrinsic(0,0))+"\n  fy: "+std::to_string(intrinsic(1,1))+"\n  cx: "+std::to_string(intrinsic(0,2))+"\n  cy: "+std::to_string(intrinsic(1,2))+"\n  png_depth_scale: "+std::to_string(png_depth_scale)+"\n  crop_edge: "+std::to_string(crop_edge);
         file << element;
         file.close();
         if (verbose)
