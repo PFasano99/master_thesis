@@ -13,7 +13,7 @@ import pickle
 
 def find_all_extention_files(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features", extension = '.pt'):
     """
-        Returns the lis tof all the file names for a given extention and checks if the save_dir path exists and creates the folder if need be.
+        Returns the list of all the file names for a given extention and checks if the save_dir path exists and creates the folder if need be.
 
         Input:
             - path_to_file:str the path to the .pt files to read
@@ -39,7 +39,7 @@ def find_all_extention_files(path_to_file = "saved-feat", save_dir = "datasets/c
     return files_extension
 
 
-def convert_pt_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features"):
+def convert_pt_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features", image_height = 1080, image_width = 1920):
     """
         This method takes in input the folder where the .pt files are located 
         (files created by the extract_conceptfusion_features.py from https://github.com/concept-fusion/concept-fusion/blob/main/examples/extract_conceptfusion_features.py)
@@ -49,7 +49,7 @@ def convert_pt_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-
             - path_to_file:str the path to the .pt files to read
             - save_dir:str the path of the forlder to save the generated images
     """
-
+    
     pt_files_names = find_all_extention_files(path_to_file, save_dir, extension='.pt')
 
     for pt_file_name in tqdm.tqdm(pt_files_names, desc = "Coloring images based on features"):
@@ -57,15 +57,14 @@ def convert_pt_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-
         pt_file = torch.load(path_to_file+"/"+pt_file_name)
 
         pt_file = pt_file.view(-1, pt_file.size()[2])
-
         pca = PCA(n_components=3)
         pca_r = pca.fit_transform(pt_file)
         pca_r = MinMaxScaler(feature_range = (0, 255), clip = True).fit_transform(pca_r)
-        pca_r = pca_r.reshape((120, 160, 3))
+        pca_r = pca_r.reshape((image_height, image_width, 3))
 
-        cv2.imwrite((save_dir+"/"+pt_file_name+".png"), pca_r)
+        cv2.imwrite((save_dir+"/"+pt_file_name[:-3]+".png"), pca_r)
 
-def pt_batch_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features", pt_names = [], pics_to_sample = 2):
+def pt_batch_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features", pt_names = [], pics_to_sample = 2, image_height = 1080, image_width = 1920):
     """
         This method takes in input the folder where the .pt files are located 
         (files created by the extract_conceptfusion_features.py from https://github.com/concept-fusion/concept-fusion/blob/main/examples/extract_conceptfusion_features.py)
@@ -107,8 +106,8 @@ def pt_batch_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-se
     for pt_file_name in tqdm.tqdm(pt_names, desc = "Saving feature to png"):
 
         pcar_s = pca_r[i]
-        pcar_s = pcar_s.reshape((120, 160, 3))
-        cv2.imwrite((save_dir+"/"+pt_file_name+"_batch.png"), pcar_s)
+        pcar_s = pcar_s.reshape((image_height, image_width, 3))
+        cv2.imwrite((save_dir+"/"+pt_file_name[:-3]+"_batch.png"), pcar_s)
         i+=1
 
 def draw_masks_fromDict(image, masks_generated) :
@@ -142,9 +141,9 @@ def SAM_masks(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-d
         # Initialize an empty canvas to store the output image
         output_image = np.zeros((result_dict[0]['segmentation'].shape[0], result_dict[0]['segmentation'].shape[1], 3), dtype=np.uint8)
         output_image = draw_masks_fromDict(output_image, result_dict)
-        cv2.imwrite((save_dir+"/"+pkl_file_name+"_mask.png"), output_image) 
+        cv2.imwrite((save_dir+"/"+pkl_file_name[:-3]+"_mask.png"), output_image) 
 
-#convert_pt_to_img(path_to_file = "./datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/saved-feat" ,save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/colored_features/feature_to_rgb")
-#SAM_masks(path_to_file = "./datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/saved-feat" ,save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/colored_features/SAM_masks")
+#convert_pt_to_img(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/feature_to_rgb")
+#SAM_masks(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/SAM_masks")
 #pt_batch_to_img(path_to_file = "./datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/saved-feat" ,save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/colored_features/batch_pca", pt_names=["133416009812234976.pt","133416009805570974.pt", "133416009798573771.pt"])
-pt_batch_to_img(path_to_file = "./datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/saved-feat" ,save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/colored_features/batch_pca", pics_to_sample= -1)
+pt_batch_to_img(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/batch_pca", pics_to_sample= -1)
