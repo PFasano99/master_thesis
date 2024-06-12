@@ -7,9 +7,11 @@ import torch
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 
+from multiprocessing.pool import ThreadPool
 import json
 import tqdm
 import pickle
+import random
 
 def find_all_extention_files(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features", extension = '.pt'):
     """
@@ -110,6 +112,40 @@ def pt_batch_to_img(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-se
         cv2.imwrite((save_dir+"/"+pt_file_name[:-3]+"_batch.png"), pcar_s)
         i+=1
 
+from concurrent.futures import ThreadPoolExecutor
+
+def pca_batch(path_to_file = "saved-feat", save_dir="datasets/cnr/hl2-sensor-dump-i32-cnr/colored_features", image_height=1080, image_width=1920, subset_size=1000):
+    pt_files_names = find_all_extention_files(path_to_file, save_dir, extension='.pt')
+    # Select a random subset of the data for PCA fitting
+    sampled_pt_files_names = random.sample(pt_files_names, subset_size)
+    print("sampled_pt_files_names", len(sampled_pt_files_names))
+    # Combine data from all .pt files to fit the PCA
+    pt_files = []
+    for pt_file_name in tqdm.tqdm(sampled_pt_files_names, desc = "Reading pt files"):
+        pt = torch.load(path_to_file+"/"+pt_file_name)
+        pt = pt.view(-1, pt.size()[2])
+        pt_files.append(pt)
+    
+    print("concatenating pt_files")
+    # Concatenate feature matrices
+    subset_data = np.concatenate(pt_files)
+    # Fit PCA and scaler on the subset data
+    print("performing PCA on subset")
+    pca = PCA(n_components=3)
+    pca.fit(subset_data)
+    scaler = MinMaxScaler(feature_range=(0, 255), clip=True)
+    scaler.fit(pca.transform(subset_data))
+
+    
+    for pt_file_name in tqdm.tqdm(pt_files_names, desc = "writing pca files"):
+        pt_file = torch.load(os.path.join(path_to_file, pt_file_name))
+        pt_file = pt_file.view(-1, pt_file.size()[2]).numpy()
+        pca_r = pca.transform(pt_file)
+        pca_r = scaler.transform(pca_r)
+        pca_r = pca_r.reshape((image_height, image_width, 3))
+        cv2.imwrite(os.path.join(save_dir, pt_file_name[:-3] + ".png"), pca_r)
+    
+
 def draw_masks_fromDict(image, masks_generated) :
   masked_image = image.copy()
   for i in range(len(masks_generated)) :
@@ -146,4 +182,5 @@ def SAM_masks(path_to_file = "saved-feat", save_dir = "datasets/cnr/hl2-sensor-d
 #convert_pt_to_img(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/feature_to_rgb")
 #SAM_masks(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/SAM_masks")
 #pt_batch_to_img(path_to_file = "./datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/saved-feat" ,save_dir = "datasets/cnr/hl2-sensor-dump-i32-cnr_original_images/colored_features/batch_pca", pt_names=["133416009812234976.pt","133416009805570974.pt", "133416009798573771.pt"])
-pt_batch_to_img(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/batch_pca", pics_to_sample= -1)
+#pt_batch_to_img(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/batch_pca", pics_to_sample= -1)
+pca_batch(path_to_file = "./build_depth/dataset/cnr_c60/saved-feat-all" ,save_dir = "./build_depth/dataset/cnr_c60/colored_features/batch_pca", subset_size=10)

@@ -6,6 +6,11 @@ from gradslam.structures.pointclouds import Pointclouds
 import tqdm
 
 def save_h5_to_ply(load_path = "./build_depth/dataset/cnr_c60/saved-map/", save_path = "./ply_files/", file_name = "meme_2.h5"):
+    if not os.path.exists(save_path):
+        
+        os.makedirs(save_path)
+
+    
     # Load the pointcloud using GradSLAM
     full_path = load_path+file_name
     print("full_path ", full_path)
@@ -41,13 +46,15 @@ def get_h5_files(folder_path):
 pt_folder = "./build_depth/dataset/cnr_c60/saved-feat/"
 tensor_paths = get_pt_files(pt_folder)
 
+load_path = "./build_depth/dataset/cnr_c60/saved-map/pointclouds/"
+save_h5_to_ply(load_path=load_path, file_name = "pc_points.h5")
 
-
-for i in tqdm.tqdm(range(14,37)):
-    load_path = "./build_depth/dataset/cnr_c60/saved-map_"+str(i)+"/"
-    save_h5_to_ply(load_path=load_path, file_name = "meme_"+str(i)+".h5")
 
 """
+for i in tqdm.tqdm(range(0,2)):
+    load_path = "./build_depth/dataset/cnr_c60/query_"+str(i)+"/"
+    save_h5_to_ply(load_path=load_path, file_name = "meme_"+str(i)+".h5")
+
 h5_files = get_h5_files("./build_depth/dataset/cnr_c60/saved-map_old/pointclouds/")
 for h5_file in h5_files:
     print("h5_file ", h5_file)

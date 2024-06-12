@@ -225,6 +225,38 @@ class Project_point
             return intrinsic_per_image;
         }
 
+    Eigen::Matrix4d read_fixed_extrinsics(const std::string &file_path = "./RAW/dump_cnr_c60/"){
+        std::ifstream file(file_path);
+        if (!file.is_open()) {
+            std::cerr << "Failed to open the file." << std::endl;
+        }
+
+        // Read the values from the file
+        std::vector<double> values;
+        std::string value;
+        while (std::getline(file, value, ',')) {
+            values.push_back(std::stod(value));
+        }
+
+        // Close the file
+        file.close();
+
+        // Check if we have exactly 16 values
+        if (values.size() != 16) {
+            std::cerr << "The file does not contain exactly 16 values." << std::endl;
+        }
+
+        // Create a 4x4 Eigen matrix and fill it with the values
+        Eigen::Matrix4d fixed_extrinsic;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                fixed_extrinsic(i, j) = values[i * 4 + j];
+            }
+        }
+
+        return fixed_extrinsic;
+
+    }
 
     std::vector<cv::Vec3f> loadLUT(const std::string& lutFilename) {
         std::ifstream depthFile(lutFilename, std::ios::binary);
@@ -781,21 +813,21 @@ class HandleMesh{
         void saveFloatMatAsGrayscaleImage(const std::vector<std::vector<float>> &floatMat, const std::string& filename) {
             int rows = floatMat.size();
             int cols = floatMat[0].size();
-            cv::Mat matrix(rows, cols, CV_32F);
+            cv::Mat matrix(rows, cols, CV_16UC1);
             for(int r = 0; r < rows; r++){
                 for(int c = 0; c < cols; c++){
-                    matrix.at<float>(r, c) = floatMat[r][c]; 
+                    matrix.at<ushort>(r, c) = floatMat[r][c] * 5000; 
                 }
             }
 
-            matrix *= 5000;
+            //matrix *= 5000;
 
             // Normalize the matrix to the range [0, 255]
-            cv::normalize(matrix, matrix, 0, 255, cv::NORM_MINMAX);
+            //cv::normalize(matrix, matrix, 0, 255, cv::NORM_MINMAX);
             
             // Convert to 16-bit grayscale image
-            cv::Mat grayscaleImage;
-            matrix.convertTo(grayscaleImage, CV_16U);
+            //cv::Mat grayscaleImage;
+            //matrix.convertTo(grayscaleImage, CV_16U);
             //saveMatAsCSV(zerosMat, "./resources/scaledMatrix_f.csv");
             cv::imwrite(filename, matrix);
         }
@@ -943,12 +975,15 @@ void make_gt_sim_from_odometry(const std::string& inputFile, const std::string& 
         std::cout << "Data rearranged and saved to file successfully: "<< outputFile << std::endl;
 }
 
-void make_gt_sim_from_extrinsics(Eigen::Matrix4d& extrinsics, const std::string& outputFile){
+void make_gt_sim_from_extrinsics(Eigen::Matrix4d& extrinsics, const std::string& outputFile, Eigen::Matrix4d& fixed_extrinsics){
     
     std::ofstream outfile;
     outfile.open(outputFile, std::ios_base::app);
-    Eigen::Matrix<double, 3, 4> submatrix = extrinsics.topRows<3>();
-    
+    Eigen::Matrix4d inverse_fixed_extrinsics = fixed_extrinsics.inverse();
+
+    Eigen::Matrix4d pose = extrinsics;// * inverse_fixed_extrinsics;
+    Eigen::Matrix<double, 3, 4> submatrix = pose.topRows<3>();
+
     if (outfile.is_open()) {
         outfile << submatrix << std::endl;
         outfile << std::endl;
@@ -995,6 +1030,9 @@ void make_dataset(int start_id = 0, int end_id = 1803, string mesh_file_path = "
     auto tuple_intrinsics = Project_point().extract_intrinsics(raw_data_path);
 
     float done_images = start_id;
+
+    Eigen::Matrix4d fixed_extrinsics = Project_point().read_fixed_extrinsics(raw_data_path+"Depth Long Throw_extrinsics.txt");
+
     omp_set_num_threads(threads_number);
     #pragma omp parallel for ordered
     for (int i = start_id; i < end_id; i+=1){
@@ -1005,7 +1043,7 @@ void make_dataset(int start_id = 0, int end_id = 1803, string mesh_file_path = "
         string timestamp = "" + to_string(std::get<0>(tuple_intrinsics[i]));
 
         #pragma omp ordered
-        make_gt_sim_from_extrinsics(extrinsic, save_path+"/odometry.gt.sim");
+        make_gt_sim_from_extrinsics(extrinsic, save_path+"/odometry.gt.sim", fixed_extrinsics);
 
         //copying all the rgb.png files to the new dataset
         try {
@@ -1055,9 +1093,9 @@ void make_dataset(int start_id = 0, int end_id = 1803, string mesh_file_path = "
         #pragma omp critical
         std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_images/tuple_intrinsics.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<tuple_intrinsics.size()<<"\r" << std::flush;
     }
-
-    save_to_txt(cal_txt, save_path, "/calibration.txt");
-    save_to_txt(association, save_path, "/association.txt");
+    cout<<""<<endl;
+    save_to_txt(cal_txt, save_path, "/calibration.txt", true);
+    save_to_txt(association, save_path, "/association.txt", true);
     //make_gt_sim(raw_data_path+"pinhole_projection/odometry.log", save_path+"/odometry.gt.sim");
     make_yaml_file(save_path, std::get<1>(tuple_intrinsics[1]),"/dataconfigs/icl.yaml");
 }
@@ -1069,7 +1107,7 @@ int main(int argc, char* argv[])
     int end_id = std::atoi(argv[2]);
 
     cout<<"start range: "<< start_id << " to "<< end_id <<endl;
-
     make_dataset(start_id, end_id);
-    std::cout<<"thanks for playing cout"<<endl;
+    cout<<"done range: "<< start_id << " to "<< end_id <<endl;
+
 }
