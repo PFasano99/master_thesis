@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(build_depth)
+project(build_vertex_dic)
 
 # Find OpenCV
 find_package(OpenCV REQUIRED)
@@ -13,6 +13,7 @@ include_directories(${EMBREE_INCLUDE_DIRS})
 #find_package(vcglib REQUIRED)
 #include_directories(${VCG_INCLUDE_DIRS})
 set(VCG_INCLUDE_DIRS ../vcglib)
+set(BUILD_DEPTH_DIR ../build_depth)
 add_subdirectory(${VCG_INCLUDE_DIRS} ${CMAKE_BINARY_DIR}/vcglib)
 
 
@@ -25,15 +26,18 @@ include_directories(
 
 # Set the source file
 set(SOURCES
-    ./build_depth.cpp
-    ./build_depth.h
+    ./build_vertex_dic.cpp
+    ./build_vertex_dic.h
+    ${BUILD_DEPTH_DIR}/build_depth.h
     ${VCG_INCLUDE_DIRS}/wrap/ply/plylib.cpp)
 
 # Add executable target
-add_executable(build_depth ${SOURCES})
+add_executable(build_vertex_dic ${SOURCES})
 
 # Link libraries
-target_link_libraries(build_depth
+target_link_libraries(
+    build_vertex_dic
+    #build_depth
     vcglib
     ${OpenCV_LIBS}
     ${EMBREE_LIBRARY}
@@ -42,4 +46,4 @@ target_link_libraries(build_depth
 )
 
 # Install executable
-install(TARGETS build_depth DESTINATION bin)
+install(TARGETS build_vertex_dic DESTINATION bin)

@@ -37,6 +37,7 @@ RUN git clone https://github.com/opencv/opencv.git && \
    
 # Copy the C++ files into the container
 COPY ./build_depth.cpp ./build_depth/build_depth.cpp
+COPY ./build_depth.h ./build_depth/build_depth.h
 COPY ./CMakeLists.txt ./build_depth/CMakeLists.txt
 
 #RUN g++ -o build_depth-cpp ./build_depth/build_depth.cpp -I /usr/local/include/opencv4/ -I /usr/local/include/embree4/ -I ./vcglib/ -I ./vcglib/eigenlib/ -I ./vcglib/wrap/ply/ -L /usr/local/lib/ -lembree4 -lopencv_core -lopencv_calib3d -lopencv_imgproc -lopencv_imgcodecs -fopenmp -O3

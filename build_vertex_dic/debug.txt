@@ -1,0 +1,101 @@
+#1 [internal] load .dockerignore
+#1 transferring context: 2B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 680B 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for Paolo.Fasano/tesi_image:cpp
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 628B done
+#4 DONE 0.0s
+
+#5 [1/5] FROM Paolo.Fasano/tesi_image:cpp
+#5 DONE 0.1s
+
+#6 [2/5] COPY ./build_vertex_dic.cpp ./build_vertex_dic/build_vertex_dic.cpp
+#6 DONE 0.1s
+
+#7 [3/5] COPY ./build_vertex_dic.h ./build_vertex_dic/build_vertex_dic.h
+#7 DONE 0.3s
+
+#8 [4/5] COPY ./CMakeLists.txt ./build_vertex_dic/CMakeLists.txt
+#8 DONE 0.4s
+
+#9 [5/5] RUN cd ./build_vertex_dic && mkdir build && cd build &&     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. &&     make -j"$(nproc)" &&     make install
+#9 0.814 -- The C compiler identification is GNU 11.4.0
+#9 0.888 -- The CXX compiler identification is GNU 11.4.0
+#9 0.906 -- Detecting C compiler ABI info
+#9 1.033 -- Detecting C compiler ABI info - done
+#9 1.046 -- Check for working C compiler: /usr/bin/cc - skipped
+#9 1.047 -- Detecting C compile features
+#9 1.048 -- Detecting C compile features - done
+#9 1.053 -- Detecting CXX compiler ABI info
+#9 1.169 -- Detecting CXX compiler ABI info - done
+#9 1.185 -- Check for working CXX compiler: /usr/bin/c++ - skipped
+#9 1.185 -- Detecting CXX compile features
+#9 1.186 -- Detecting CXX compile features - done
+#9 1.190 -- Found OpenCV: /usr/local (found version "4.10.0") 
+#9 1.651 -- Found OpenMP_C: -fopenmp (found version "4.5") 
+#9 1.819 -- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+#9 1.819 -- Found OpenMP: TRUE (found version "4.5")  
+#9 1.819 -- - Eigen - using bundled source
+#9 1.822 -- Configuring done
+#9 1.839 -- Generating done
+#9 1.840 -- Build files have been written to: /workspace/build_vertex_dic/build
+#9 1.892 [ 33%] Building CXX object CMakeFiles/build_vertex_dic.dir/workspace/vcglib/wrap/ply/plylib.cpp.o
+#9 1.894 [ 66%] Building CXX object CMakeFiles/build_vertex_dic.dir/build_vertex_dic.cpp.o
+#9 5.307 In file included from /workspace/build_vertex_dic/build_vertex_dic.cpp:1:
+#9 5.307 /workspace/build_vertex_dic/build_vertex_dic.h: In constructor 'Project_vertex_to_image::Project_vertex_to_image(std::string, int, bool)':
+#9 5.307 /workspace/build_vertex_dic/build_vertex_dic.h:18:70: error: use of deleted function 'HandleMesh& HandleMesh::operator=(const HandleMesh&)'
+#9 5.307    18 |             mesh_handler = HandleMesh(path_to_ply, n_threads, verbose);
+#9 5.307       |                                                                      ^
+#9 5.307 In file included from /workspace/build_vertex_dic/build_vertex_dic.h:1,
+#9 5.307                  from /workspace/build_vertex_dic/build_vertex_dic.cpp:1:
+#9 5.307 /workspace/build_vertex_dic/../build_depth/build_depth.h:446:7: note: 'HandleMesh& HandleMesh::operator=(const HandleMesh&)' is implicitly deleted because the default definition would be ill-formed:
+#9 5.307   446 | class HandleMesh{
+#9 5.307       |       ^~~~~~~~~~
+#9 5.307 /workspace/build_vertex_dic/../build_depth/build_depth.h:446:7: error: use of deleted function 'HandleMesh::MyMesh& HandleMesh::MyMesh::operator=(const HandleMesh::MyMesh&)'
+#9 5.307 /workspace/build_vertex_dic/../build_depth/build_depth.h:453:11: note: 'HandleMesh::MyMesh& HandleMesh::MyMesh::operator=(const HandleMesh::MyMesh&)' is implicitly deleted because the default definition would be ill-formed:
+#9 5.307   453 |     class MyMesh : public vcg::tri::TriMesh< std::vector<MyVertex>, std::vector<MyEdge>, std::vector<MyFace>  > {};
+#9 5.307       |           ^~~~~~
+#9 5.307 /workspace/build_vertex_dic/../build_depth/build_depth.h:453:11: error: 'vcg::tri::TriMesh<Container0, Container1, Container2, Container3, Container4> vcg::tri::TriMesh<Container0, Container1, Container2, Container3, Container4>::operator=(const vcg::tri::TriMesh<Container0, Container1, Container2, Container3, Container4>&) [with Container0 = std::vector<HandleMesh::MyVertex>; Container1 = std::vector<HandleMesh::MyEdge>; Container2 = std::vector<HandleMesh::MyFace>; Container3 = vcg::tri::DummyContainer; Container4 = vcg::tri::DummyContainer]' is private within this context
+#9 5.307 In file included from /workspace/vcglib/vcg/complex/complex.h:47,
+#9 5.307                  from /workspace/build_vertex_dic/../build_depth/build_depth.h:15,
+#9 5.307                  from /workspace/build_vertex_dic/build_vertex_dic.h:1,
+#9 5.307                  from /workspace/build_vertex_dic/build_vertex_dic.cpp:1:
+#9 5.307 /workspace/vcglib/vcg/complex/base.h:551:17: note: declared private here
+#9 5.307   551 |         TriMesh operator =(const TriMesh &  /*m*/){assert(0);return TriMesh();}
+#9 5.307       |                 ^~~~~~~~
+#9 6.350 make[2]: *** [CMakeFiles/build_vertex_dic.dir/build.make:76: CMakeFiles/build_vertex_dic.dir/build_vertex_dic.cpp.o] Error 1
+#9 6.350 make[1]: *** [CMakeFiles/Makefile2:100: CMakeFiles/build_vertex_dic.dir/all] Error 2
+#9 6.352 make: *** [Makefile:136: all] Error 2
+#9 ERROR: process "/bin/sh -c cd ./build_vertex_dic && mkdir build && cd build &&     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. &&     make -j\"$(nproc)\" &&     make install" did not complete successfully: exit code: 2
+------
+ > [5/5] RUN cd ./build_vertex_dic && mkdir build && cd build &&     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. &&     make -j"$(nproc)" &&     make install:
+#9 5.307 In file included from /workspace/vcglib/vcg/complex/complex.h:47,
+#9 5.307                  from /workspace/build_vertex_dic/../build_depth/build_depth.h:15,
+#9 5.307                  from /workspace/build_vertex_dic/build_vertex_dic.h:1,
+#9 5.307                  from /workspace/build_vertex_dic/build_vertex_dic.cpp:1:
+#9 5.307 /workspace/vcglib/vcg/complex/base.h:551:17: note: declared private here
+#9 5.307   551 |         TriMesh operator =(const TriMesh &  /*m*/){assert(0);return TriMesh();}
+#9 5.307       |                 ^~~~~~~~
+#9 6.350 make[2]: *** [CMakeFiles/build_vertex_dic.dir/build.make:76: CMakeFiles/build_vertex_dic.dir/build_vertex_dic.cpp.o] Error 1
+#9 6.350 make[1]: *** [CMakeFiles/Makefile2:100: CMakeFiles/build_vertex_dic.dir/all] Error 2
+#9 6.352 make: *** [Makefile:136: all] Error 2
+------
+Dockerfile:8
+--------------------
+   7 |     
+   8 | >>> RUN cd ./build_vertex_dic && mkdir build && cd build && \
+   9 | >>>     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \
+  10 | >>>     make -j"$(nproc)" && \
+  11 | >>>     make install
+  12 |     
+--------------------
+ERROR: failed to solve: process "/bin/sh -c cd ./build_vertex_dic && mkdir build && cd build &&     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. &&     make -j\"$(nproc)\" &&     make install" did not complete successfully: exit code: 2
+Error loading the mesh from: ./resources/room_1st.off 
+3b20f2141670
