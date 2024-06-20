@@ -42,7 +42,7 @@ RUN pip install git+https://github.com/openai/CLIP.git
 RUN pip install git+https://github.com/facebookresearch/segment-anything.git 
 #RUN pip install git+https://github.com/facebookresearch/pytorch3d.git
 #RUN pip install git+https://github.com/krrish94/chamferdist.git
-RUN pip install chamferdist
+#RUN pip install chamferdist
 RUN pip install open_clip_torch
 #RUN pip install git+https://github.com/gradslam/gradslam.git@conceptfusion
 

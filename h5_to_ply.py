@@ -21,7 +21,7 @@ def save_h5_to_ply(load_path = "./build_depth/dataset/cnr_c60/saved-map/", save_
     pcd = pointclouds.open3d(0)
 
     # Save the pointcloud as a .ply file using Open3D
-    o3d.io.write_point_cloud(save_path+file_name[:-2]+"ply", pcd)
+    o3d.io.write_point_cloud(save_path+"base_gs_"+file_name[:-2]+"ply", pcd)
 
 def get_pt_files(folder_path):
     # List all files in the given folder
@@ -46,7 +46,8 @@ def get_h5_files(folder_path):
 pt_folder = "./build_depth/dataset/cnr_c60/saved-feat/"
 tensor_paths = get_pt_files(pt_folder)
 
-load_path = "./build_depth/dataset/cnr_c60/saved-map/pointclouds/"
+load_path = "./base-gradslam/pointclouds/"
+#load_path = "./build_depth/dataset/cnr_c60/saved-map/pointclouds/"
 save_h5_to_ply(load_path=load_path, file_name = "pc_points.h5")
 
 
