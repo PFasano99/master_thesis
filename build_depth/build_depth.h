@@ -41,11 +41,8 @@ class Project_point
     private: int n_threads = 1;
     private: bool verbose = false;
 
-    //public:
-    //    Project_point(){}
-
     public:
-        Project_point(int threads = 4, bool isVerbose = false)
+        Project_point(int threads = 1, bool isVerbose = false)
         {
             n_threads = threads;
             verbose = isVerbose;
@@ -303,12 +300,7 @@ class Project_point
 
         @description 
             Given a set of directions and the 4x4 matrix representing pv2world for each image.
-            The directions returned are in world space
-            To return the value in world space the operations are the following:
-                1. the coordnates are made homogeneous by adding a 4th value to the 3d point
-                2. the extrinsics matrix is multiplied by the homogeneous coordinate
-                3. the resulting value are normalized deviding the value of the first 3 indexes of the vector by the 4th 
-                    value of the same vector
+            This method calls coord_to_mesh_space() and returns the matrix of transformed 3d coords.
 
         @returns std::vector<std::vector<vcg::Point3f>> world_space_directions: the matrix of world space 3d coords
 
@@ -322,28 +314,46 @@ class Project_point
             
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
-                    vcg::Point3f directions = image_directions[r][c];
-
-                    // Formulate camera coordinates as a homogeneous 4x1 vector
-                    Eigen::Vector4d cameraCoordsHomogeneous;
-                    cameraCoordsHomogeneous << directions[0], directions[1], directions[2], 1.0f;
-
-                    Eigen::Vector4d worldCoordsHomogeneous = extrinsic * cameraCoordsHomogeneous;
-
-                    // Normalize the homogeneous coordinates
-                    vcg::Point3f worldCoords(
-                        (worldCoordsHomogeneous(0) / worldCoordsHomogeneous(3)),
-                        (worldCoordsHomogeneous(1) / worldCoordsHomogeneous(3)),
-                        (worldCoordsHomogeneous(2) / worldCoordsHomogeneous(3))
-                    );
-
-                    world_space_directions[r][c] = worldCoords;
-
+                    world_space_directions[r][c] = coord_to_mesh_space(extrinsic, image_directions[r][c]);
                 }
             }
 
         return world_space_directions;
     }
+
+    /*
+        @param Eigen::Matrix4d &extrinsic: the 4x4 image extrinsics matrix
+        @param vcg::Point3f& coords: coordinates to be transformed from local scale to world space
+
+        @description 
+            Given a set of coords and the 4x4 matrix representing pv2world for each image.
+            The directions returned are in world space
+            To return the value in world space the operations are the following:
+                1. the coordnates are made homogeneous by adding a 4th value to the 3d point
+                2. the extrinsics matrix is multiplied by the homogeneous coordinate
+                3. the resulting value are normalized deviding the value of the first 3 indexes of the vector by the 4th 
+                    value of the same vector
+
+        @returns vcg::Point3f worldCoords: the coords in world space
+
+    */
+    public:
+        vcg::Point3f coord_to_mesh_space(const Eigen::Matrix4d &extrinsic, const vcg::Point3f& coords){
+            // Formulate camera coordinates as a homogeneous 4x1 vector
+            Eigen::Vector4d cameraCoordsHomogeneous;
+            cameraCoordsHomogeneous << coords[0], coords[1], coords[2], 1.0f;
+
+            Eigen::Vector4d worldCoordsHomogeneous = extrinsic * cameraCoordsHomogeneous;
+
+            // Normalize the homogeneous coordinates
+            vcg::Point3f worldCoords(
+                (worldCoordsHomogeneous(0) / worldCoordsHomogeneous(3)),
+                (worldCoordsHomogeneous(1) / worldCoordsHomogeneous(3)),
+                (worldCoordsHomogeneous(2) / worldCoordsHomogeneous(3))
+            );
+
+            return worldCoords;
+        }
 
     public: 
         void print_frame_pv(long long timestamp, string path_to_pv){
@@ -605,6 +615,21 @@ class HandleMesh{
                 vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[1], &mesh2.vert[3]);
                 vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[3], &mesh2.vert[4]);
                 vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[4], &mesh2.vert[2]);
+            }
+
+            int mask = vcg::tri::io::Mask::IOM_VERTCOORD;
+            mask |= vcg::tri::io::Mask::IOM_EDGEINDEX;
+            tri::io::ExporterPLY<MyMesh>::Save(mesh2, file_name.c_str(), mask);
+        }
+
+    public:
+        void visualize_points_in_mesh(vcg::Point3f &origin, std::vector<vcg::Point3f> &directions, string file_name = "./resources/test_OriginDirections.off"){
+
+            MyMesh mesh2;
+            vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, origin);
+            for(int r = 0; r < directions.size(); r++){
+                vcg::Point3f direction = directions[r];                 
+                vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, direction);
             }
 
             int mask = vcg::tri::io::Mask::IOM_VERTCOORD;
