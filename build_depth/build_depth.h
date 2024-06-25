@@ -22,6 +22,7 @@
 #include <wrap/io_trimesh/import_ply.h>
 #include <wrap/io_trimesh/import_off.h>
 
+
 #include <time.h>
 #include <vcg/math/gen_normal.h>
 #include <vcg/complex/allocate.h>
@@ -39,6 +40,9 @@ class Project_point
 {
     private: int n_threads = 1;
     private: bool verbose = false;
+
+    //public:
+    //    Project_point(){}
 
     public:
         Project_point(int threads = 4, bool isVerbose = false)
@@ -428,7 +432,8 @@ class HandleMesh{
     // Destructor
     public:
         ~HandleMesh() {
-            std::cout << "MeshHandler destructor called." << std::endl;
+            if(verbose)
+                std::cout << "MeshHandler destructor called." << std::endl;
         }
 
     /*
@@ -779,6 +784,33 @@ class HandleMesh{
             //matrix.convertTo(grayscaleImage, CV_16U);
             //saveMatAsCSV(zerosMat, "./resources/scaledMatrix_f.csv");
             cv::imwrite(filename, matrix);
+        }
+
+    
+    public:
+        void select_vertex_from_map(map<int, vector<vcg::Point2f>>& map, string save_path, string filename){
+            // Check if the directory already exists
+            if (!filesystem::exists(save_path)) {
+                // Create the directory
+                if (filesystem::create_directory(save_path)) {
+                    std::cout << "Directory created successfully: "<< save_path << std::endl;
+                } else {
+                    std::cerr << "Error: Failed to create directory: " << save_path << std::endl;
+                }
+            }
+
+            MyMesh mesh2;
+
+            for(auto it = map.cbegin(); it != map.cend(); ++it)
+            {
+                int key = it->first;
+                vcg::Point3f coords = mesh.vert[key].P();
+                vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, coords);
+            }
+
+            int mask = vcg::tri::io::Mask::IOM_VERTCOORD;
+            mask |= vcg::tri::io::Mask::IOM_EDGEINDEX;
+            tri::io::ExporterPLY<MyMesh>::Save(mesh2, (save_path+"/"+filename).c_str(), mask);
         }
 
 };

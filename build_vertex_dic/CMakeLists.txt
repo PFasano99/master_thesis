@@ -9,9 +9,10 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(embree 4 REQUIRED)
 include_directories(${EMBREE_INCLUDE_DIRS})
 
+#Find nlohmann/json
+find_package(nlohmann_json REQUIRED)
+include_directories(${INTERFACE_INCLUDE_DIRECTORIES})
 # Find VCGlib
-#find_package(vcglib REQUIRED)
-#include_directories(${VCG_INCLUDE_DIRS})
 set(VCG_INCLUDE_DIRS ../vcglib)
 set(BUILD_DEPTH_DIR ../build_depth)
 add_subdirectory(${VCG_INCLUDE_DIRS} ${CMAKE_BINARY_DIR}/vcglib)
@@ -39,6 +40,7 @@ target_link_libraries(
     build_vertex_dic
     #build_depth
     vcglib
+    nlohmann_json::nlohmann_json
     ${OpenCV_LIBS}
     ${EMBREE_LIBRARY}
     -fopenmp

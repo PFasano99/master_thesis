@@ -1,13 +1,15 @@
 #include "../build_depth/build_depth.h"
 #include <map>
+#include <nlohmann/json.hpp>
 
+using json = nlohmann::json;
 using namespace std;
 using namespace vcg;
 
 class Project_vertex_to_image
 {
 
-    private: int n_threads = 1;
+    private: int n_threads = 32;
     private: bool verbose = false;
     private: string path_to_mesh;
     private: string path_to_dataset;
@@ -84,7 +86,6 @@ class Project_vertex_to_image
             }
         }
     
-
     public: 
         void add_value_to_map(map<long long, vector<vcg::Point2f>>& map, long long key, vector<vcg::Point2f> values){
             for(int i = 0; i < values.size(); i++){
@@ -131,8 +132,6 @@ class Project_vertex_to_image
                 outter_map[key] = inner_map;
             }
         }
-
-
 
     public:
         void print_map(map<vcg::Point2f,vector<vcg::Point3f>>& map, vcg::Point2f key){
@@ -235,10 +234,9 @@ class Project_vertex_to_image
             }
         }
 
-
         // Function to convert the map to a JSON string
     public:
-        void mapToJson(const std::map<int, std::vector<Point2f>>& data, string save_path, string timestamp) {
+        void map_to_json(const std::map<int, std::vector<Point2f>>& data, string save_path, string timestamp) {
             // Check if the directory already exists
             if (!filesystem::exists(save_path)) {
                 // Create the directory
@@ -277,7 +275,7 @@ class Project_vertex_to_image
                 oss << "]}";
             }
 
-            oss << "}";
+            oss << "\n}";
             
             string full_path = save_path+"/"+timestamp+".json";
             // Save JSON string to file
@@ -287,98 +285,248 @@ class Project_vertex_to_image
 
         }
 
-
     public:
-        void compute_vertexes_per_image(const HandleMesh& mesh_handler, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic){
-            map<vcg::Point2f,vector<vcg::Point3f>> map;
-            Eigen::Matrix4d extrinsicInverse = extrinsic.inverse();
-            for (int vIdx = 0; vIdx < mesh_handler.mesh.vert.size(); ++vIdx) {
-                vcg::Point3f vertex = mesh_handler.mesh.vert[vIdx].P();
-                Eigen::Vector4d vertexHomogeneous(vertex[0], vertex[1], vertex[2], 1.0);
-                Eigen::Vector4d camCoords = extrinsicInverse * vertexHomogeneous;
-                
-                if (camCoords[2] <= 0) continue; // Vertex is behind the camera
+        std::map<int, std::vector<Point2f>> json_to_map(string save_path, string timestamp){
+            std::map<int, std::vector<Point2f>> resultMap;
 
-                Eigen::Vector3d imageCoords = intrinsic * camCoords.head<3>();
-                cv::Point2f pixel(imageCoords[0] / imageCoords[2], imageCoords[1] / imageCoords[2]);
-
-                if (pixel.x >= 0 && pixel.x < depthImage.cols && pixel.y >= 0 && pixel.y < depthImage.rows) {
-                    vcg::Point2f key((int)pixel.x,(int)pixel.y);
-                    add_value_to_map(map, key, vertex);
-                }
-            }
-
-            //print_map(map);
-            //cout<<"mesh_handler.mesh.vert.size() "<<mesh_handler.mesh.vert.size()<<endl;
-            //cout<<"map.size()"<<map.size()<<endl;
-        }
-
-    public:
-        void compute_vertexes_per_image(map<int, map<long long, vector<vcg::Point2f>>>& outter_map, const HandleMesh& mesh_handler, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic, long long timestamp){
+            // Open the JSON file
+            ifstream file(save_path+"/"+timestamp+".json");
+            if (!file.is_open()) {
+                cerr << "Failed to open file\n";
+                throw std::invalid_argument( "received non existing path: "+save_path+"/"+timestamp+".json" );
+            }       
             
-            Eigen::Matrix4d extrinsicInverse = extrinsic.inverse();
-            for (int vIdx = 0; vIdx < mesh_handler.mesh.vert.size(); ++vIdx) {
-                map<long long, vector<vcg::Point2f>> inner_map;
-                vcg::Point3f vertex = mesh_handler.mesh.vert[vIdx].P();
-                Eigen::Vector4d vertexHomogeneous(vertex[0], vertex[1], vertex[2], 1.0);
-                Eigen::Vector4d camCoords = extrinsicInverse * vertexHomogeneous;
+            json jsonData;
+            file >> jsonData;
+            file.close();
+
+            // Parse the JSON data
+            for (auto& [key, value] : jsonData.items()) {
+                int intKey = std::stoi(key);
+                std::vector<Point2f> coords;
                 
-                if (camCoords[2] <= 0) continue; // Vertex is behind the camera
-
-                Eigen::Vector3d imageCoords = intrinsic * camCoords.head<3>();
-                cv::Point2f pixel(imageCoords[0] / imageCoords[2], imageCoords[1] / imageCoords[2]);
-
-                if (pixel.x >= 0 && pixel.x < depthImage.cols && pixel.y >= 0 && pixel.y < depthImage.rows) {
-                    vcg::Point2f value((int)pixel.x,(int)pixel.y);
-                    add_value_to_map(inner_map, timestamp, value);
+                for (auto& coord : value["pixel_coords"]) {
+                    vcg::Point2f p2f_coord(coord["x"], coord["y"]);
+                    //float x = coord["x"];
+                    //float y = coord["y"];
+                    coords.emplace_back(p2f_coord);
                 }
-                if(inner_map.size()>0)
-                    add_value_to_map(outter_map, vIdx, inner_map);
+
+                resultMap[intKey] = coords;
             }
 
-            //print_map(outter_map);
-            //cout<<"mesh_handler.mesh.vert.size() "<<mesh_handler.mesh.vert.size()<<endl;
-            //cout<<"map.size()"<<outter_map.size()<<endl;
+            return resultMap;
         }
 
     public:
-        void compute_vertexes_per_image(const HandleMesh& mesh_handler, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic, long long timestamp, string save_path){
-            map<int, vector<vcg::Point2f>> map;
+        map<int, vector<vcg::Point2f>> compute_vertexes_per_image(const HandleMesh& mesh_handler, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic, long long timestamp, string save_path, float depthScale = 5000, bool save_json = true){
+            map<int, vector<vcg::Point2f>> map;           
+            std::vector<int> valid_vertex = get_possible_vertex_id(mesh_handler, depthImage, extrinsic, intrinsic);
+            //cout << "get_possible_vertex_id: " << valid_vertex.size() <<" out of "<< mesh_handler.mesh.vert.size() <<endl;
+            
+            Project_point point_projector();
+
+            float fx = intrinsic(0,0);
+            float fy = intrinsic(1,1);
+            float cx = intrinsic(0,2);
+            float cy = intrinsic(1,2);
             Eigen::Matrix4d extrinsicInverse = extrinsic.inverse();
-            for (int vIdx = 0; vIdx < mesh_handler.mesh.vert.size(); ++vIdx) {
-                vcg::Point3f vertex = mesh_handler.mesh.vert[vIdx].P();
-                Eigen::Vector4d vertexHomogeneous(vertex[0], vertex[1], vertex[2], 1.0);
-                Eigen::Vector4d camCoords = extrinsicInverse * vertexHomogeneous;
-                
-                if (camCoords[2] <= 0) continue; // Vertex is behind the camera
+            //std::vector<std::vector<vcg::Point3f>> ray_direction_ws(depthImage.rows, std::vector<vcg::Point3f>(depthImage.cols));
+            for (int y = 0; y < depthImage.rows; ++y) {
+                //cout << y << "\r" << flush;
+                for (int x = 0; x < depthImage.cols; ++x) { //depthImage.cols
+                    //cout << y << ","<<x<<"\r"<<flush; 
+                    // Read depth value from depth map (assuming single-channel float)
+                    uint16_t depthValue = depthImage.at<uint16_t>(y, x);
+                    float depth = depthValue * (1/depthScale);
 
-                Eigen::Vector3d imageCoords = intrinsic * camCoords.head<3>();
-                cv::Point2f pixel(imageCoords[0] / imageCoords[2], imageCoords[1] / imageCoords[2]);
+                    if (depth > 0) { // Valid depth value
+                        // Compute 3D point in camera coordinates
+                        vcg::Point2f pixel(x,y);
+                        //point_projector.Unproject(pixel, depth, intrinsic);
+                        float Xc = ((x - cx) / fx) * depth;
+                        float Yc = ((y - cy) / fy) * depth;
+                        float Zc = depth;
 
-                if (pixel.x >= 0 && pixel.x < depthImage.cols && pixel.y >= 0 && pixel.y < depthImage.rows) {
-                    vcg::Point2f value((int)pixel.x,(int)pixel.y);
-                    add_value_to_map(map, vIdx, value);
+                        Eigen::Vector4d pointCamera(Xc, Yc, Zc, 1.0);
+                        // Transform to world coordinates
+                        Eigen::Vector4d pointWorld = extrinsicInverse * pointCamera;
+                        // Transform to world coordinates (assuming no rotation or translation)
+                        vcg::Point3f worldPoint(pointWorld(0), pointWorld(1), -pointWorld(2));
+                        //ray_direction_ws[y][x] = worldPoint; 
+                        //cout << "coords: x:" << Xc << " y:"<<Yc << " z:"<<Zc<<endl;
+                        // Check visibility against point cloud vertices
+                        // Iterate over point cloud vertices to find the closest vertex
+                        float minDist = std::numeric_limits<float>::max();
+                        int closestVertexIdx = -1;
+                        for (int vIdx = 0; vIdx < valid_vertex.size(); ++vIdx) {
+                            //cout << " checking vertex "<< vIdx << "         \r"<< std::flush;
+                            vcg::Point3f vertex = mesh_handler.mesh.vert[valid_vertex[vIdx]].P();
+                            //if((vertex[0] > 0 && Xc > 0 || (vertex[0] < 0 && Xc < 0)) && (vertex[1] > 0 && Yc > 0 || (vertex[1] < 0 && Yc < 0)) && (vertex[2] > 0 && Zc > 0 || (vertex[2] < 0 && Zc < 0))){
+                            // Calculate distance between worldPoint and vertexPos
+                            float distance = (worldPoint - vertex).Norm(); // Euclidean distance
+                            //cout << "distance "<< distance << endl;
+                            if (distance < minDist) {
+                                minDist = distance;
+                                closestVertexIdx = vIdx;
+
+                                if (minDist < 0.01)
+                                    break;
+                            }                       
+                        }
+                            //cout << "picked "<<closestVertexIdx << " with distance "<< minDist<<endl;
+                        vcg::Point3f vertex = mesh_handler.mesh.vert[valid_vertex[closestVertexIdx]].P();
+
+                        //cout << "picked id "<< closestVertexIdx << endl;
+                        //cout<<"pointWorld(0) "<<pointWorld(0) << " vertex[0] " << vertex[0] <<endl;
+                        //cout<<"pointWorld(1) "<<pointWorld(1) << " vertex[1] " << vertex[1] <<endl;
+                        //cout<<"pointWorld(2) "<<pointWorld(2) << " vertex[2] " << vertex[2] <<endl;
+                        //cout << minDist << endl;
+                        add_value_to_map(map, closestVertexIdx, pixel);   
+                    }
                 }
                 
             }
+
+            //std::vector<std::vector<vcg::Point3f>> direction(2, std::vector<vcg::Point3f>(2));
+            //direction[0][0] = ray_direction_ws[0][0];
+            //direction[0][1] = ray_direction_ws[0][depthImage.cols-1];
+            //direction[1][0] = ray_direction_ws[depthImage.rows-1][0];
+            //direction[1][1] = ray_direction_ws[depthImage.rows-1][depthImage.cols-1];
+            //vcg::Point3f origin(0,0,0);
+            //HandleMesh().visualize_points_in_mesh(origin, direction,path_to_dataset+"cnr_c60/ply_files/"+to_string(timestamp)+"_9.ply", true);
+            
             //cout<<"here map.size() "<<map.size()<<endl;
-            if (map.size()>0)
-                mapToJson(map, save_path, to_string(timestamp));
+            if (map.size()>0 && save_json)
+                map_to_json(map, save_path, to_string(timestamp));
+            
+            return map;
         }
 
     public:
-        void get_vetex_to_pixel_dict(string path_to_pv, string path_to_depth_folder, string save_path){
+        std::vector<int> get_possible_vertex_id(const HandleMesh& mesh_handler, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic, float depthScale = 5000, float threshold = 0.1){
+            float fx = intrinsic(0,0);
+            float fy = intrinsic(1,1);
+            float cx = intrinsic(0,2);
+            float cy = intrinsic(1,2);
+
+            Eigen::Matrix4d extrinsicInverse = extrinsic.inverse();
+
+            std::vector<int> valid_vrtx_id;
+
+            uint16_t depthValue = depthImage.at<uint16_t>(0, 0);
+            float depth = depthValue * (1/depthScale);
+            vcg::Point3f worldPoint_0;
+            if(depth > 0){
+                float X_0 = ((0 - cx) / fx) * depth;
+                float Y_0 = ((0 - cy) / fy) * depth;
+                float Z_0 = depth;
+
+                Eigen::Vector4d pointCamera_0(X_0, Y_0, Z_0, 1.0);
+                // Transform to world coordinates
+                Eigen::Vector4d pointWorld = extrinsicInverse * pointCamera_0;
+                //upper_left
+                worldPoint_0[0] = pointWorld(0); 
+                worldPoint_0[1] = pointWorld(1); 
+                worldPoint_0[2] = -pointWorld(2); 
+            }
+
+
+            uint16_t depthValue_middle = depthImage.at<uint16_t>(depthImage.rows/2, depthImage.cols/2);
+            float depth_middle = depthValue_middle * (1/depthScale);
+
+            vcg::Point3f worldPoint_middle;
+            if(depth_middle > 0){
+                float X_middle = ((depthImage.cols/2 - cx) / fx) * depth_middle;
+                float Y_middle = ((depthImage.rows/2 - cy) / fy) * depth_middle;
+                float Z_middle = depth_middle;
+
+                Eigen::Vector4d pointCamera_middle(X_middle, Y_middle, Z_middle, 1.0);
+                // Transform to world coordinates
+                Eigen::Vector4d pointWorld_middle = extrinsicInverse * pointCamera_middle;
+                //upper_left
+                worldPoint_middle[0]=pointWorld_middle(0);
+                worldPoint_middle[1]=pointWorld_middle(1);
+                worldPoint_middle[2]=-pointWorld_middle(2);
+            }
+
+            float distance_0_middle = (worldPoint_0 - worldPoint_middle).Norm();
+            //cout<<"distance_0_middle "<<distance_0_middle<<endl;       
+            float distance_and_threshold = distance_0_middle+ threshold;
+            //cout<<"distance_and_threshold "<<distance_and_threshold<<endl;       
+
+
+            for (int vIdx = 0; vIdx < mesh_handler.mesh.vert.size(); ++vIdx) {
+                vcg::Point3f vertex = mesh_handler.mesh.vert[vIdx].P();
+                float distance = (vertex - worldPoint_middle).Norm();
+                //cout<<"abs(distance_and_threshold) "<<abs(distance_and_threshold) << " abs(distance) " << abs(distance) << endl;
+
+                if(abs(distance_and_threshold) >= abs(distance)){
+                    //cout<<"abs(distance_and_threshold) "<<abs(distance_and_threshold) << " abs(distance) " << abs(distance) << endl;
+                    valid_vrtx_id.push_back(vIdx);                        
+
+                }
+
+            }
+            return valid_vrtx_id;
+        }
+
+    public:
+        std::vector<int> filter_valid_vrtx_id(const HandleMesh& mesh_handler, std::vector<int> prev_valid_id, float y_filter, bool ascend = true){
             
-            Project_point projector = Project_point(n_threads);
-            HandleMesh mesh_handler = HandleMesh(path_to_mesh, n_threads, verbose);
+            std::vector<int> valid_vertex;
+            for (int vIdx = 0; vIdx < prev_valid_id.size(); ++vIdx) {
+                //cout << " checking vertex "<< vIdx << "         \r"<< std::flush;
+                vcg::Point3f vertex = mesh_handler.mesh.vert[prev_valid_id[vIdx]].P();
+                if(vertex[1] < y_filter && ascend || vertex[1] > y_filter && !ascend){
+                    valid_vertex.push_back(prev_valid_id[vIdx]);    
+                }               
+            }   
+            return valid_vertex;
+        }
+
+    public:
+        vcg::Point3f get_world_point(int x, int y, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic, float depthScale = 5000){
+            float fx = intrinsic(0,0);
+            float fy = intrinsic(1,1);
+            float cx = intrinsic(0,2);
+            float cy = intrinsic(1,2);
+
+            Eigen::Matrix4d extrinsicInverse = extrinsic.inverse();
+            uint16_t depthValue = depthImage.at<uint16_t>(y, x);
+            float depth = depthValue * (1/depthScale);
+
+            if(depth > 0){
+                float X_0 = ((x - cx) / fx) * depth;
+                float Y_0 = ((y - cy) / fy) * depth;
+                float Z_0 = depth;
+
+                Eigen::Vector4d pointCamera_0(X_0, Y_0, Z_0, 1.0);
+                // Transform to world coordinates
+                Eigen::Vector4d pointWorld = extrinsicInverse * pointCamera_0;
+                //upper_left
+                vcg::Point3f worldPoint(pointWorld(0), pointWorld(1), -pointWorld(2));
+                return worldPoint;
+            }
+
+            vcg::Point3f worldPoint(0,0,0);
+                return worldPoint; 
+        }
+
+    public:
+        auto get_vetex_to_pixel_dict(string path_to_pv, string path_to_depth_folder, string save_path){
+            
+            Project_point projector = Project_point(1);
+            HandleMesh mesh_handler = HandleMesh(path_to_mesh, 1, verbose);
             //
             path_to_pv = path_to_dataset+path_to_pv;
             auto tuple_intrinsics = projector.extract_intrinsics(path_to_pv);
             float done_images = 1;
-            //map<int, map<long long, vector<vcg::Point2f>>> map;
+            map<long long, map<int, vector<vcg::Point2f>>> map;
 
             omp_set_num_threads(n_threads);
             #pragma omp parallel for ordered
+            //for (int i = 0; i < tuple_intrinsics.size(); i+=1){
             for (int i = 0; i < tuple_intrinsics.size(); i+=1){
                 //tuple_intrinsics.size()
                 Eigen::Matrix3d intrinsic = std::get<1>(tuple_intrinsics[i]);
@@ -388,7 +536,7 @@ class Project_vertex_to_image
                 string path_to_depth = path_to_dataset+path_to_depth_folder+"/"+to_string(timestamp)+"_depth.png";
                 
                 #pragma omp critical
-                compute_vertexes_per_image(mesh_handler, loadDepthImage(path_to_depth), extrinsic, intrinsic, timestamp, path_to_dataset+save_path);
+                map[timestamp] = compute_vertexes_per_image(mesh_handler, loadDepthImage(path_to_depth), extrinsic, intrinsic, timestamp, path_to_dataset+save_path);
                 //compute_vertexes_per_image(map, mesh_handler, loadDepthImage(path_to_depth), extrinsic, intrinsic, timestamp);
 
                 #pragma omp critical
@@ -397,8 +545,6 @@ class Project_vertex_to_image
             }
             cout<<""<<endl;
             //cout<<"map.size() "<<map.size()<<endl;
+            return map;
         }
-
-    
-
 };

@@ -1,5 +1,14 @@
 # Use Paolo.Fasano/tesi_image:cpp as the base image so remember to build the docker image in build_depth folder beforhand
 FROM Paolo.Fasano/tesi_image:cpp 
+
+# Cloning and installing nlohmann/json to use in the build_vertex_dic.h to read json
+RUN git clone https://github.com/nlohmann/json.git && \
+    cd ./json && mkdir build && cd build && \
+    cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \
+    make -j"$(nproc)" && \
+    make install  && ldconfig
+
+
 # Copy the C++ files into the container
 COPY ./build_vertex_dic.cpp ./build_vertex_dic/build_vertex_dic.cpp
 COPY ./build_vertex_dic.h ./build_vertex_dic/build_vertex_dic.h

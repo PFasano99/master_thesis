@@ -1,22 +1,48 @@
-docker image build -t Paolo.Fasano/tesi_image:cpp .  #--no-cache
+: '
+    The run_build_depth.sh has two parameters if not set it will both build and run:
+        - build_only, if true the script will only build the docker image; 
+        - run_only, if true the script will only run from a previously build image;
 
-cd ../
-path_to_data="$(pwd)"
-cd ./build_depth
+'
+build_only=false
+run_only=false
 
-c=0
-
-# Loop over the range of numbers from 1 to 1800
-for ((i = 0; i <= 1800; i+=50)); do
-    trap 'echo "SIGINT received, stopping loop"; exit' INT
-    # Call the compiled C++ program with the current number as argument
-    docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth "$c" "$i"
-    c=$i
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --build_only)
+            build_only="$2"
+            shift 2
+            ;;
+        --run_only)
+            run_only="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
 done
 
-docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth 1800 1803
+if [[ "$run_only" == false ]]; then
+    docker image build -t Paolo.Fasano/tesi_image:cpp .  #--no-cache
+fi
 
-docker ps -a | grep Paolo.Fasano/tesi_image:cpp | awk '{print $1}' | xargs docker rm
+if [[ "$build_only" == false ]]; then
+    cd ../
+    path_to_data="$(pwd)"
+    cd ./build_depth
 
+    c=0
 
-#/home/paolo.fasano/tesi_fasano/build_depth
+    # Loop over the range of numbers from 1 to 1800
+    for ((i = 0; i <= 1800; i+=50)); do
+        trap 'echo "SIGINT received, stopping loop"; exit' INT
+        # Call the compiled C++ program with the current number as argument
+        docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth "$c" "$i"
+        c=$i
+    done
+
+    docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth 1800 1803
+    docker ps -a | grep Paolo.Fasano/tesi_image:cpp | awk '{print $1}' | xargs docker rm
+fi
