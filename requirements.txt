@@ -6,3 +6,4 @@ torch
 torchvision 
 tqdm
 tyro
+imutils

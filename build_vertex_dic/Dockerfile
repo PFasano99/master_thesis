@@ -8,11 +8,23 @@ RUN git clone https://github.com/nlohmann/json.git && \
     make -j"$(nproc)" && \
     make install  && ldconfig
 
+# Download and install LibTorch
+RUN apt-get update && apt-get install -y wget \ 
+        unzip \
+        python3-dev \
+        python3-pip 
+        
+# Install Python packages
+# Copy the requirements.txt file into the container at /app
+COPY ./requirements.txt ./build_vertex_dic/requirements.txt
+RUN pip3 install -r ./build_vertex_dic/requirements.txt
 
 # Copy the C++ files into the container
 COPY ./build_vertex_dic.cpp ./build_vertex_dic/build_vertex_dic.cpp
 COPY ./build_vertex_dic.h ./build_vertex_dic/build_vertex_dic.h
 COPY ./CMakeLists.txt ./build_vertex_dic/CMakeLists.txt
+
+COPY ./read_pt.py ./build_vertex_dic/read_pt.py
 
 RUN cd ./build_vertex_dic && mkdir build && cd build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \

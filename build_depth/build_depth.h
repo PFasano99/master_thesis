@@ -838,4 +838,14 @@ class HandleMesh{
             tri::io::ExporterPLY<MyMesh>::Save(mesh2, (save_path+"/"+filename).c_str(), mask);
         }
 
+
+    public:
+        void print_point3f(vcg::Point3f& point, bool vertical = false){
+            if(vertical)
+                cout<<"x: " << point[0] << "\ny: " << point[1] << "\nz: " << point[2] << endl;
+            else
+                cout<<"x: " << point[0] << " y: " << point[1] << " z: " << point[2] << endl;
+
+        } 
+
 };
