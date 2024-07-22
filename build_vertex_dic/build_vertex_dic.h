@@ -4,18 +4,10 @@
 #include <nlohmann/json.hpp>
 #include <chrono>
 
-//#include <torch/torch.h>
-//#include <torch/script.h>
-//#include <boost/python.hpp>
-//#include <Python.h>
-
-//namespace py = boost::python;
-
 using namespace std::chrono;
 using json = nlohmann::json;
 using namespace std;
 using namespace vcg;
-//using namespace boost::python;
 
 class Project_vertex_to_image
 {
@@ -34,6 +26,14 @@ class Project_vertex_to_image
             path_to_dataset = dataset_path;
         }
 
+    /*
+        @param const std::string& filePath, path to the depth image to read
+
+        @description
+            given the path to a depth.png image, use openvc to read the image
+
+        @return cv::Mat representing the image 
+    */
     public:
         cv::Mat loadDepthImage(const std::string& filePath) {
             cv::Mat depthImage = cv::imread(filePath, cv::IMREAD_UNCHANGED);
@@ -43,6 +43,15 @@ class Project_vertex_to_image
             return depthImage;
         }
 
+    /*
+        All the following methods called add_value_to_map work the same way with sligltly different parameters 
+        @param
+
+        @description
+            given a pointer to a map, a key and a value, adds the value in the map at the given key
+
+        @return
+    */
     public: 
         void add_value_to_map(map<int,vector<vcg::Point2f>>& map, int key, vector<vcg::Point2f> values){
             for(int i = 0; i < values.size(); i++){
@@ -119,6 +128,18 @@ class Project_vertex_to_image
             }
         }
 
+    /*
+        All the methods called print_map work the same way with sligltly different parameters
+
+        @param
+
+        @description
+            Given a pointer to a map and 
+            - a key if you want to print a specific value or 
+            - not giving any key to print all the values in the map
+
+        @return
+    */
     public:
         void print_map(map<int,vector<vcg::Point2f>>& map, int key){
             vector<vcg::Point2f> values = map[key];
@@ -143,8 +164,6 @@ class Project_vertex_to_image
             cout<<endl;
 
         }
-
-
 
     public:
         void print_map(map<int,vector<vcg::Point2f>>& map){
@@ -230,8 +249,17 @@ class Project_vertex_to_image
 
         }
 
+    /*
+        All the methods called map_to_json work the same way with slightly different parameters 
 
-        // Function to convert the map to a JSON string
+        @param
+
+        @description
+            Given a pointer to a map, a save path and a file_name, this function to convert the map to a JSON string
+            and saves it to the save_path/filename.json
+
+        @return
+    */
     public:
         void map_to_json(const std::map<int, std::vector<Point2f>>& data, string save_path, string timestamp) {
             // Check if the directory already exists
@@ -313,6 +341,15 @@ class Project_vertex_to_image
             }
 
 
+    /*
+        @param string save_path, path to the saved json
+        @param string timestamp, json filename
+
+        @description
+            Given the path to the json file, returns a map of the data in the json
+
+        @return std::map<int, std::vector<Point2f>> resultMap, the values of the json as a map
+    */
     public:
         std::map<int, std::vector<Point2f>> json_to_map(string save_path, string timestamp){
             std::map<int, std::vector<Point2f>> resultMap;
@@ -346,9 +383,18 @@ class Project_vertex_to_image
             return resultMap;
         }
 
+    /*
+        @param const Eigen::Tensor<float, 3>& tensor, pointer to the 3D Eigen::tensor to save
+        @param string save_path, path to the folder to save the .bin file
+        @parma string file_name, name of the file to save
+
+        @description
+            given a Eigen::Tensor<float, 3>, saves it's values in a binary file
+
+        @return
+    */
     public:    
         void save_tensor_to_binary(const Eigen::Tensor<float, 3>& tensor, string save_path, string file_name) {
-            
             // Check if the directory already exists
             if (!filesystem::exists(save_path)) {
                 // Create the directory
@@ -381,51 +427,26 @@ class Project_vertex_to_image
             file.close();
         }
 
+    /*
+        @param const HandleMesh& mesh_handler,
+        @param const cv::Mat& depthImage,
+        @param const Eigen::Matrix4d& extrinsic,
+        @param const Eigen::Matrix3d& intrinsic,
+        @param long long timestamp,
+        @param string save_path,
+        @param map<int,vector<long long>>& map_vertex_to_timestamp,
+        @param float depthScale = 5000,
+        @param float depth_threshold = 0.001,
+        @param bool save_json = true
 
-    public:// Function to save the map to a binary file
-        void save_map_to_binary(const std::map<int, Eigen::Tensor<float, 1>>& map, string save_path, string file_name) {
-            
-            // Check if the directory already exists
-            if (!filesystem::exists(save_path)) {
-                // Create the directory
-                if (filesystem::create_directory(save_path)) {
-                    std::cout << "Directory created successfully: "<< save_path << std::endl;
-                } else {
-                    std::cerr << "Error: Failed to create directory: " << save_path << std::endl;
-                }
-            }
-            
-            string full_path = save_path+"/"+file_name;
+        @description
+            This method is to map the 3D vertices of a given mesh to their corresponding 2D pixel coordinates in a 
+            depth image, using the provided extrinsic and intrinsic camera parameters. It also associates each 
+            vertex with a timestamp and optionally saves the resulting mapping to a JSON file.
 
-            std::ofstream file(full_path, std::ios::binary);
-            if (!file) {
-                std::cerr << "Unable to open file: " << full_path << std::endl;
-                exit(EXIT_FAILURE);
-            }
-
-            // Save the size of the map
-            size_t map_size = map.size();
-            file.write(reinterpret_cast<const char*>(&map_size), sizeof(map_size));
-
-            // Save each key and its corresponding tensor
-            for (const auto& pair : map) {
-                int key = pair.first;
-                const Eigen::Tensor<float, 1>& tensor = pair.second;
-
-                // Save the key
-                file.write(reinterpret_cast<const char*>(&key), sizeof(key));
-
-                // Save the size of the tensor
-                int tensor_size = tensor.size();
-                file.write(reinterpret_cast<const char*>(&tensor_size), sizeof(tensor_size));
-
-                // Save the tensor data
-                file.write(reinterpret_cast<const char*>(tensor.data()), tensor_size * sizeof(float));
-            }
-
-            file.close();
-        }
-
+        @return
+            map<int, vector<vcg::Point2f>> vertex_map A map where the key is the vertex index and the value is a vector of 2D pixel coordinates (vcg::Point2f).
+    */
     public: 
         map<int, vector<vcg::Point2f>> compute_vertexes_per_image(const HandleMesh& mesh_handler, const cv::Mat& depthImage, const Eigen::Matrix4d& extrinsic, const Eigen::Matrix3d& intrinsic, long long timestamp, string save_path, map<int,vector<long long>>& map_vertex_to_timestamp, float depthScale = 5000, float depth_threshold = 0.001,  bool save_json = true){
             map<int, vector<vcg::Point2f>> vertex_map;
@@ -466,6 +487,14 @@ class Project_vertex_to_image
             
         }
 
+    /*
+        @param const filesystem::path& directory, the path where the file is located
+        @param const std::string& extension, the extension of the file to search
+
+        @description this method returns a vector of paths to all the files with the given extention
+
+        @return files vector of paths to the files with given extention
+    */
     public:
         std::vector<filesystem::path> findFilesWithExtension(const filesystem::path& directory, const std::string& extension) {
             std::vector<filesystem::path> files;
@@ -483,6 +512,16 @@ class Project_vertex_to_image
             return files;
         }
 
+    /*
+        @param const std::string& file_path, the path to the .bin file
+        @param int dim1=1080, the first dimension of the tensor
+        @param int dim2=1920, the second dimension of the tensor
+        @param int dim3=1024, the third dimension of the tensor
+
+        @description given a path to a binary file, this method reads the file and adds its values to the Eigen::Tensor
+
+        @return Eigen::TensorMap<Eigen::Tensor<float, 3>> tensor
+    */
     Eigen::Tensor<float, 3> load_tensor_from_binary(const std::string& file_path, int dim1=1080, int dim2=1920, int dim3=1024) {
         std::ifstream file(file_path, std::ios::binary);
         if (!file) {
@@ -497,61 +536,97 @@ class Project_vertex_to_image
         Eigen::TensorMap<Eigen::Tensor<float, 3>> tensor(buffer.data(), dim1, dim2, dim3);
         return tensor;
     }
+    
+    /*
+        @param const Eigen::Tensor<float, 3>& tensor,
+        @param int x, 
+        @param int y,
 
+        @description given a 3 dimensional tensor and two coordinates, x and y, 
+            this method returns a one dimensional tensor containing all the values over the third dimension
+
+        @return Eigen::Tensor<float, 1> values
+    */
     Eigen::Tensor<float, 1> get_values_from_coordinates(const Eigen::Tensor<float, 3>& tensor, int x, int y) {
         int dim3 = tensor.dimension(2);
         Eigen::Tensor<float, 1> values(dim3);
+        values.setZero();
         
         for (int z = 0; z < dim3; ++z) {
+            //if (tensor(x, y, z) != 0){
             values(z) = tensor(x, y, z);
+            //}
         }
 
         return values;
     }
-
+    
+    /*
+        @param map<long long, map<int, vector<vcg::Point2f>>>& map_vertex, a map indexed by the frame timestamp of a map indexed by the vertex id of 2d coordinates
+        @param std::vector<string> timestamps, the vector of all the timestamps of the .bin to concatenate
+        @param string path_to_features, path to the folder containing the features extrated by clip
+        @param string path_to_json, path to the json containing the vertex coornd map (not used for now) 
+        
+        @description Given the vector of timestamps and the map of features, for each timestamp, load the feature binary 
+            file and
+            - For each vertex, I retrieve the features (the 1x1x1024 tensor) for each pixel identified earlier.
+            - I sum the features together (based on the vertex ID).
+            - I normalize after summing all the features.
+        
+        @return std::map<int, Eigen::Tensor<float, 1>> tensors; 
+    */
     public:
-        std::map<int, Eigen::Tensor<float, 1>> concatenate_features(map<long long, map<int, vector<vcg::Point2f>>>& map, std::vector<string> timestamps, string path_to_features="./resources/dataset/cnr_c60/saved-feat", string path_to_json="./resources/dataset/cnr_c60/vertex_images_json",  string save_path = "", bool save_features = true){
+        std::map<int, Eigen::Tensor<float, 1>> concatenate_features(map<long long, map<int, vector<vcg::Point2f>>>& map_vertex, std::vector<string> timestamps, string path_to_features="./resources/dataset/cnr_c60/saved-feat", string path_to_json="./resources/dataset/cnr_c60/vertex_images_json"){
         
             int done_timestamps = 0;
             std::map<int, Eigen::Tensor<float, 1>> tensors;
-
+            
             cout<<"loading and summing tensors..."<<endl;
-            std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_timestamps/timestamps.size()*100 << "% | "<<static_cast<int>(done_timestamps)<<"/"<<timestamps.size()<<"\r" << std::flush;
-
-            omp_set_num_threads(n_threads);
-            #pragma omp parallel for 
+            //cout << "number of threads "<< n_threads << endl;
+            std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_timestamps/timestamps.size()*100 << "% | "<<static_cast<int>(done_timestamps)<<"/"<<timestamps.size()<<"\r" << std::flush;             
+           
+            cout << "timestamps.size() " << timestamps.size() << endl;
             for (int i = 0; i<timestamps.size(); i++){//timestamps.size()
+                cout<< i<<"/"<<timestamps.size()<<": concatenate_features: " <<timestamps[i]<<"\r" << std::flush;
                 auto tensor = load_tensor_from_binary(path_to_features+"/"+timestamps[i]+".bin");
-                std::map<int, std::vector<Point2f>> vertex_image_json = json_to_map(path_to_json, timestamps[i]);
-
+                //auto tensor = load_tensor_from_binary(path_to_features+"/133468485003417754.bin");
+                std::map<int, std::vector<Point2f>> vertex_image_json = map_vertex[stoll(timestamps[i])]; //json_to_map(path_to_json, timestamps[i]);
+                //std::map<int, std::vector<Point2f>> vertex_image_json = json_to_map(path_to_json, "133468485003417754");
+                
                 for(auto it = vertex_image_json.cbegin(); it != vertex_image_json.cend(); ++it){
                     int key = it->first;   
                     std::vector<Point2f> p2f_json = vertex_image_json[key];
-
+                    
+                    #pragma omp parallel for 
                     for(int i = 0; i < p2f_json.size(); i++){
-                        
-                        if (tensors[key].size()==0){
-                            #pragma omp critical
-                            tensors[key] = get_values_from_coordinates(tensor, p2f_json[i][0], p2f_json[i][1]);        
-                        }
-                        else{
-                            #pragma omp critical
-                            tensors[key] += get_values_from_coordinates(tensor, p2f_json[i][0], p2f_json[i][1]); 
-                        }
-
+                        if(tensors[key].size()==0)
+                            tensors[key] = get_values_from_coordinates(tensor, p2f_json[0][0], p2f_json[0][1]);
+                        else
+                            tensors[key] += get_values_from_coordinates(tensor, p2f_json[0][0], p2f_json[0][1]);
                     }
                 }
 
+
                 //print_map(tensors);
-
                 done_timestamps++;
-                #pragma omp critical
                 std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_timestamps/timestamps.size()*100 << "% | "<<static_cast<int>(done_timestamps)<<"/"<<timestamps.size()<<"\r" << std::flush;
-
             }
 
             cout<<"normalizing tensors.."<<endl;
-            
+            //l2-norm
+            for(auto it = tensors.cbegin(); it != tensors.cend(); ++it){
+                int key = it->first;   
+
+                // Compute the L2 norm of the tensor
+                Eigen::Tensor<float, 0> norm = tensors[key].square().sum().sqrt();
+
+                // Perform L2 normalization
+                if(norm(0) > 0) { // To avoid division by zero
+                    tensors[key] = tensors[key] / norm(0);
+                }
+            }
+
+            /* min/max normalization
             for(auto it = tensors.cbegin(); it != tensors.cend(); ++it){
                 int key = it->first;   
 
@@ -561,10 +636,15 @@ class Project_vertex_to_image
                 // Compute the normalized tensor
                 tensors[key] = (tensors[key] - min_value(0)) / (max_value(0) - min_value(0));   
             }
-            
+            */
             return tensors;
         }
     
+    /*
+        @param const Eigen::Tensor<float, 3>& tensor
+
+        @description A support method to print a 3 dimensional Eigen::Tensor
+    */
     public:
         void print_tensor(const Eigen::Tensor<float, 3>& tensor) {
             int dim0 = tensor.dimension(0);
@@ -582,15 +662,23 @@ class Project_vertex_to_image
             }
         }
 
+    /*
+        @param std::map<int, Eigen::Tensor<float, 1>>& tensors, the map of all the features indexed by the vertexes id
+        @param map<long long, map<int, vector<vcg::Point2f>>>& vertex_map, a map indexed by the frame timestamp of a map indexed by the vertex id of 2d coordinates
+        @param long long timestamp, timestamps of the .bin to save
+        @param string save_path, the path to the save folder
+        @param int dim1 = 1080, int dim2 = 1920, int dim3 = 1024, the dimensions of the 3d tensor
 
-
+        @description
+            Given a timestamp and the map of features, create a Eigen::Tensor<float,3> tensor with the dimensions 
+    */
     public:
         void save_tensor_ordered(std::map<int, Eigen::Tensor<float, 1>>& tensors, map<long long, map<int, vector<vcg::Point2f>>>& vertex_map, long long timestamp, string save_path, int dim1 = 1080, int dim2 = 1920, int dim3 = 1024){
+            
             map<int, vector<vcg::Point2f>> vertex = vertex_map[timestamp];
             //cout << "timestamp " << timestamp << endl;
             Eigen::Tensor<float,3> tensor(dim1, dim2, dim3);
             tensor.setZero();
-
             for(auto it = vertex.cbegin(); it != vertex.cend(); ++it){
                 int key = it->first;   
                 //cout << "key: " << key << endl;
@@ -599,6 +687,7 @@ class Project_vertex_to_image
                 int x = coords[0];
                 int y = coords[1];
                 //cout << "x " << x << " y " << y << endl;
+                
                 for(int i = 0; i < dim3; i++){
                     tensor(x,y,i) = tensors[key](i);
                 }            
@@ -606,9 +695,15 @@ class Project_vertex_to_image
 
             string ts = to_string(timestamp)+".bin";
             save_tensor_to_binary(tensor, save_path, ts);
-
         }        
 
+    /*
+        @param const std::string& file_name, path to file 
+        @param Eigen::Tensor<float, 3>& tensor, pointer to a 3d tensor 
+
+        @description 
+            Given a path to a binary file containing a tensor, deserialize the data into a 3d Eigen::tensor of float
+    */
     public:
         void read_tensor_from_binary(const std::string& file_name, Eigen::Tensor<float, 3>& tensor) {
             std::ifstream file(file_name, std::ios::binary);
@@ -631,12 +726,28 @@ class Project_vertex_to_image
             file.close();
         }
 
+
+    /*
+
+        @param string path_to_pv, path to raw data from hololens
+        @param string path_to_depth_folder, path to the depth pics reconstructed using build_depth.cpp/.h
+        @param string json_save_path, path to save json_files
+        @param string bin_save_path, path to save the tensors as .bin files
+
+        @description
+            The following method works as follows:
+            - For each vertex, I identify which pixels from which images compose it.
+            - For each vertex, I retrieve the features (the 1x1x1024 tensor) for each pixel identified earlier.
+            - I sum the features together (based on the vertex ID).
+            - I normalize, using a l2-normalization, after summing all the features.
+            - I reconstruct the image by setting a tensor to zero (1080x1920x1024) and replacing the pixels at 
+                position (nxm) with the features we calculated (where the positions are dictated by the coordinates 
+                based on the vertices).
+    */
     public:
-        auto get_vetex_to_pixel_dict(string path_to_pv, string path_to_depth_folder, string save_path){
-            
+        auto get_vetex_to_pixel_dict(string path_to_pv, string path_to_depth_folder, string clip_feat_path, string json_save_path, string bin_save_path){
             Project_point projector = Project_point(1);
             HandleMesh mesh_handler = HandleMesh(path_to_mesh, 1, verbose);
-            //
             path_to_pv = path_to_dataset+path_to_pv;
             auto tuple_intrinsics = projector.extract_intrinsics(path_to_pv);
             float done_images = 0;
@@ -645,8 +756,9 @@ class Project_vertex_to_image
 
             std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_images/tuple_intrinsics.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<tuple_intrinsics.size()<<"\r" << std::flush;
 
-            auto bin_paths = findFilesWithExtension(path_to_dataset+"cnr_c60/saved-feat", ".bin");
+            auto bin_paths = findFilesWithExtension(path_to_dataset+clip_feat_path, ".bin");
             vector<string> bin_timestamp;
+            vector<string> bin_timestamp_rect;
             for (const auto& file : bin_paths) {
                 bin_timestamp.push_back(file.filename().stem().string());
                 //std::cout << file.filename().stem().string() << std::endl;
@@ -666,8 +778,8 @@ class Project_vertex_to_image
                     
                     //cout<<to_string(timestamp)<<endl;
                     string path_to_depth = path_to_dataset+path_to_depth_folder+"/"+to_string(timestamp)+"_depth.png";
-                    map_vertex[timestamp] = compute_vertexes_per_image(mesh_handler, loadDepthImage(path_to_depth), extrinsic, intrinsic, timestamp, path_to_dataset+save_path, map_vertex_to_timestamp);
-
+                    map_vertex[timestamp] = compute_vertexes_per_image(mesh_handler, loadDepthImage(path_to_depth), extrinsic, intrinsic, timestamp, path_to_dataset+json_save_path, map_vertex_to_timestamp);
+                    bin_timestamp_rect.push_back(to_string(timestamp));
                 }
                 
                 #pragma omp critical
@@ -675,25 +787,18 @@ class Project_vertex_to_image
                 done_images++;
             }
 
-            cout<<"map_vertex_to_timestamp "<< map_vertex_to_timestamp.size()<<endl;
-            map_to_json(map_vertex_to_timestamp, path_to_dataset+"/cnr_c60", "vertex_timestamp");
-            std::map<int, Eigen::Tensor<float, 1>> tensors = concatenate_features(map_vertex, bin_timestamp);
+            map_to_json(map_vertex_to_timestamp, path_to_dataset+json_save_path, "vertex_timestamp");
+            std::map<int, Eigen::Tensor<float, 1>> tensors = concatenate_features(map_vertex, bin_timestamp_rect);
             
             cout<<"saving tensors.."<<endl;
             done_images=0;
-            std::cout<<"saved "<<std::setprecision(3) << std::fixed<< done_images/tuple_intrinsics.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<tuple_intrinsics.size()<<"\r" << std::flush;
-
-            omp_set_num_threads(n_threads);
-            #pragma omp parallel for
-            for (int i = 0; i < tuple_intrinsics.size(); i+=1){//tuple_intrinsics.size()
-                long long timestamp = std::get<0>(tuple_intrinsics[i]);
-                if(std::find(bin_timestamp.begin(), bin_timestamp.end(), to_string(timestamp)) != bin_timestamp.end())
-                {
-                    save_tensor_ordered(tensors, map_vertex, timestamp, path_to_dataset+"/cnr_c60/concat_feats");
-                }
-
-                #pragma omp critical
-                std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_images/tuple_intrinsics.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<tuple_intrinsics.size()<<"\r" << std::flush;
+            std::cout<<"saved "<<std::setprecision(3) << std::fixed<< done_images/bin_timestamp_rect.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<bin_timestamp_rect.size()<<"\r" << std::flush;
+            //#pragma omp parallel for
+            for (int i = 0; i < bin_timestamp_rect.size(); i+=1){//tuple_intrinsics.size()
+                long long timestamp = stoll(bin_timestamp_rect[i]);
+                save_tensor_ordered(tensors, map_vertex, timestamp, path_to_dataset+bin_save_path);
+                //#pragma omp critical
+                cout<<"saved: " <<to_string(timestamp)<<" "<<std::setprecision(3) << std::fixed<< done_images/bin_timestamp_rect.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<bin_timestamp_rect.size()<<"\r" << std::flush;
                 done_images++;
             }
 
@@ -702,7 +807,6 @@ class Project_vertex_to_image
 
             cout << " took " << elapsed.count() << " seconds" << endl;       
             cout<<""<<endl;
-            //cout<<"map.size() "<<map.size()<<endl;
             return map_vertex;
         }
 };
