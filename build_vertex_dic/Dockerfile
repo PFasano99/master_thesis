@@ -24,7 +24,7 @@ COPY ./build_vertex_dic.cpp ./build_vertex_dic/build_vertex_dic.cpp
 COPY ./build_vertex_dic.h ./build_vertex_dic/build_vertex_dic.h
 COPY ./CMakeLists.txt ./build_vertex_dic/CMakeLists.txt
 
-COPY ./read_pt.py ./build_vertex_dic/read_pt.py
+COPY ./bin_to_png.py ./build_vertex_dic/bin_to_png.py
 
 RUN cd ./build_vertex_dic && mkdir build && cd build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \
