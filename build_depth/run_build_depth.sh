@@ -2,10 +2,11 @@
     The run_build_depth.sh has two parameters if not set it will both build and run:
         - build_only, if true the script will only build the docker image; 
         - run_only, if true the script will only run from a previously build image;
-
+        - delate_container, if true all the container from the image will be delated;
 '
 build_only=false
 run_only=false
+delate_container=true
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -17,6 +18,10 @@ while [[ $# -gt 0 ]]; do
             run_only="$2"
             shift 2
             ;;
+        --delate_container)
+            delate_container="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1"
             exit 1
@@ -24,11 +29,12 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "$run_only" == false ]]; then
+if [[ "$build_only" == true ]]; then
     docker image build -t Paolo.Fasano/tesi_image:cpp .  #--no-cache
+    delate_container=false
 fi
 
-if [[ "$build_only" == false ]]; then
+if [[ "$run_only" == true ]]; then
     cd ../
     path_to_data="$(pwd)"
     cd ./build_depth
@@ -44,5 +50,11 @@ if [[ "$build_only" == false ]]; then
     done
 
     docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth 1800 1803
-    docker ps -a | grep Paolo.Fasano/tesi_image:cpp | awk '{print $1}' | xargs docker rm
+   
+    if [[ "$delate_container" == true ]]; then
+        echo "Delating container of image Paolo.Fasano/tesi_image:cpp"
+        docker ps -a | grep Paolo.Fasano/tesi_image:cpp | awk '{print $1}' | xargs docker rm
+    fi
+
+    
 fi

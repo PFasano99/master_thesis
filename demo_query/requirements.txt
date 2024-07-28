@@ -1,0 +1,7 @@
+matplotlib
+opencv-python
+open3d
+torchvision 
+tyro
+imutils
+open_clip_torch

@@ -14,9 +14,13 @@
 
 #include <vcg/complex/complex.h>
 #include <vcg/complex/algorithms/create/platonic.h>
+#include <vcg/complex/algorithms/update/color.h>
+
 #include <Eigen/Dense>
+
 //import export
 #include<wrap/io_trimesh/import.h>
+#include<wrap/io_trimesh/export.h>
 #include <wrap/io_trimesh/export_off.h>
 #include <wrap/io_trimesh/export_ply.h>
 #include <wrap/io_trimesh/import_ply.h>
@@ -635,6 +639,30 @@ class HandleMesh{
             int mask = vcg::tri::io::Mask::IOM_VERTCOORD;
             mask |= vcg::tri::io::Mask::IOM_EDGEINDEX;
             tri::io::ExporterPLY<MyMesh>::Save(mesh2, file_name.c_str(), mask);
+        }
+
+    /*
+        @param string outputMeshPath,  path+name+extention of the mesh to save
+        @param int mask, the mask for the mesh to save
+
+        @description this is a wrapper for savig meshes in vcglib
+    */
+    public:
+        void save_mesh(string outputMeshPath, int mask = -1){
+            if (mask == -1){
+                if(tri::io::Exporter<MyMesh>::Save(mesh, outputMeshPath.c_str()) != 0) {
+                    cerr << "Error saving mesh: " << outputMeshPath << endl;
+                }
+                else
+                    cout << "Mesh saved correctly at: " << outputMeshPath << endl;
+            }
+            else{
+                if(tri::io::Exporter<MyMesh>::Save(mesh, outputMeshPath.c_str(), mask) != 0) {
+                    cerr << "Error saving mesh: " << outputMeshPath << endl;
+                }
+                else
+                    cout << "Mesh saved correctly at: " << outputMeshPath << endl;
+            }
         }
 
     /*
