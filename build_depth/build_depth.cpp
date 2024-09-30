@@ -1,6 +1,17 @@
 #include "./build_depth.h"
 
 bool verbose = false;
+
+void create_directory_if_not_exists(const std::string& path) {
+    if (!filesystem::exists(path)) {
+        if (filesystem::create_directories(path)) {
+            std::cout << "Directory created successfully: " << path << std::endl;
+        } else {
+            std::cerr << "Error: Failed to create directory: " << path << std::endl;
+        }
+    }
+}
+
 /*
     @param string test_mesh_path: the path to save the generated control meshes 
     @param string save_path: the path to save the generated folders
@@ -13,57 +24,12 @@ bool verbose = false;
                 |_ depth
                 |_ rgb
 */
-void make_all_dirs(string test_mesh_path =  "./resources/ray_coord_mesh/", string save_path = "./resources/dataset/cnr_c60"){
+void make_all_dirs(const string test_mesh_path =  "./resources/dataset/ray_coord_mesh/", const string save_path = "./resources/dataset/cnr_c60"){
 
-    // Check if the directory already exists
-    if (!filesystem::exists(test_mesh_path)) {
-        // Create the directory
-        if (filesystem::create_directory(test_mesh_path)) {
-            std::cout << "Directory created successfully: " << test_mesh_path << std::endl;
-        } else {
-            std::cerr << "Error: Failed to create directory: "<< test_mesh_path << std::endl;
-        }
-    }
-
-    // Check if the directory already exists
-    if (!filesystem::exists(save_path)) {
-        // Create the directory
-        if (filesystem::create_directory(save_path)) {
-            std::cout << "Directory created successfully: "<< save_path << std::endl;
-        } else {
-            std::cerr << "Error: Failed to create directory: " << save_path << std::endl;
-        }
-    }
-
-    // Check if the directory already exists
-    if (!filesystem::exists(save_path+"/rgb")) {
-        // Create the directory
-        if (filesystem::create_directory(save_path+"/rgb/")) {
-            std::cout << "Directory created successfully: "<< save_path+"/rgb" << std::endl;
-        } else {
-            std::cerr << "Error: Failed to create directory: " << save_path+"/rgb" << std::endl;
-        }
-    }
-
-    // Check if the directory already exists
-    if (!filesystem::exists(save_path+"/depth/")) {
-        // Create the directory
-        if (filesystem::create_directory(save_path+"/depth")) {
-            std::cout << "Directory created successfully: "<< save_path+"/depth" << std::endl;
-        } else {
-            std::cerr << "Error: Failed to create directory: " << save_path+"/depth" << std::endl;
-        }
-    }
-
-    // Check if the directory already exists
-    if (!filesystem::exists(save_path+"/dataconfigs")) {
-        // Create the directory
-        if (filesystem::create_directory(save_path+"/dataconfigs")) {
-            std::cout << "Directory created successfully: "<< save_path+"/dataconfigs" << std::endl;
-        } else {
-            std::cerr << "Error: Failed to create directory: " << save_path+"/dataconfigs" << std::endl;
-        }
-    }
+    create_directory_if_not_exists(test_mesh_path);
+    create_directory_if_not_exists(save_path + "/rgb");
+    create_directory_if_not_exists(save_path + "/depth");
+    create_directory_if_not_exists(save_path + "/dataconfigs");
 
 }
 
@@ -141,20 +107,19 @@ void make_gt_sim_from_odometry(const std::string& inputFile, const std::string& 
         std::cout << "Data rearranged and saved to file successfully: "<< outputFile << std::endl;
 }
 
-void make_gt_sim_from_extrinsics(Eigen::Matrix4d& extrinsics, const std::string& outputFile, Eigen::Matrix4d& fixed_extrinsics){
+void make_gt_sim_from_extrinsics(const Eigen::Matrix4d& extrinsics, const std::string& outputFile){
     
     std::ofstream outfile;
     outfile.open(outputFile, std::ios_base::app);
-    Eigen::Matrix4d inverse_fixed_extrinsics = fixed_extrinsics.inverse();
 
-    Eigen::Matrix4d pose = extrinsics;// * inverse_fixed_extrinsics;
-    Eigen::Matrix<double, 3, 4> submatrix = pose.topRows<3>();
+    Eigen::Matrix<double, 3, 4> submatrix = extrinsics.topRows<3>();
 
     if (outfile.is_open()) {
         outfile << submatrix << std::endl;
         outfile << std::endl;
         // Close the file
         outfile.close();
+        
         if (verbose)
             std::cout << "Data rearranged and saved to file successfully: "<< outputFile << std::endl;
     } 
@@ -183,7 +148,7 @@ void make_yaml_file(string file_path, Eigen::Matrix3d intrinsic, string file_nam
 }
 
 
-void make_dataset(int start_id = 0, int end_id = 1803, string mesh_file_path = "./resources/dataset/room_1st.off", string raw_data_path = "./resources/dataset/dump_cnr_c60/", string test_mesh_path =  "./resources/dataset/ray_coord_mesh/", string save_path = "./resources/dataset/cnr_c60" , int threads_number = 16){
+void make_dataset(int start_id, int end_id, string mesh_file_path = "./resources/dataset/room_1st.off", string raw_data_path = "./resources/dataset/dump_cnr_c60/", string test_mesh_path =  "./resources/dataset/ray_coord_mesh/", string save_path = "./resources/dataset/cnr_c60" , int threads_number = 64){
     
     //create all the necessary folders
     make_all_dirs();    
@@ -191,84 +156,107 @@ void make_dataset(int start_id = 0, int end_id = 1803, string mesh_file_path = "
     HandleMesh mesh_handler = HandleMesh(mesh_file_path, threads_number);
     Project_point projector = Project_point(threads_number, verbose);
 
-    std::vector<string> cal_txt;
-    std::vector<string> association;
     auto tuple_intrinsics = Project_point().extract_intrinsics(raw_data_path);
-
+    std::vector<string> cal_txt(tuple_intrinsics.size(),"");
+    std::vector<string> association(tuple_intrinsics.size(),"");
+    
     float done_images = start_id;
-
-    Eigen::Matrix4d fixed_extrinsics = Project_point().read_fixed_extrinsics(raw_data_path+"Depth Long Throw_extrinsics.txt");
-
+    std::cout << "processed " << std::setprecision(3) << std::fixed << done_images / tuple_intrinsics.size() * 100 << "% | " << static_cast<int>(done_images) << "/" << tuple_intrinsics.size() << "\r" << std::flush;
     omp_set_num_threads(threads_number);
-    #pragma omp parallel for ordered
-    for (int i = start_id; i < end_id; i+=1){
+    #pragma omp parallel for 
+    for (int i = done_images; i < end_id; i+=1){
         //tuple_intrinsics.size()
+        string timestamp = "" + to_string(std::get<0>(tuple_intrinsics[i]));
         Eigen::Matrix3d intrinsic = std::get<1>(tuple_intrinsics[i]);
         Eigen::Matrix4d extrinsic = std::get<2>(tuple_intrinsics[i]);
         
-        string timestamp = "" + to_string(std::get<0>(tuple_intrinsics[i]));
-
-        #pragma omp ordered
-        make_gt_sim_from_extrinsics(extrinsic, save_path+"/odometry.gt.sim", fixed_extrinsics);
-
         //copying all the rgb.png files to the new dataset
         try {
             // Check if the source file exists
             if (!filesystem::exists(raw_data_path+"PV/"+timestamp+".png")) {
                 std::cerr << "Error: Source file does not exist: " << raw_data_path+"PV/"+timestamp+".png" << std::endl;
             }
-
             // Copy the file
             filesystem::copy_file(raw_data_path+"PV/"+timestamp+".png", save_path+"/rgb/"+timestamp+".png", filesystem::copy_options::overwrite_existing);
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
         }
 
-        #pragma omp ordered
-        association.push_back(std::to_string(i)+" "+ save_path+"/depth/"+timestamp+"_depth.png " + std::to_string(i)+" "+save_path+"/rgb/"+timestamp+".png ");
-        #pragma omp orederd
-        cal_txt.push_back(timestamp + " " +  std::to_string(intrinsic(0,0)) + " " + std::to_string(intrinsic(1,1)) +" "+ std::to_string(intrinsic(0,2)) +" "+std::to_string(intrinsic(1,2)));
-
+        association[i] = (std::to_string(i)+" "+ save_path+"/depth/"+timestamp+"_depth.png " + std::to_string(i)+" "+save_path+"/rgb/"+timestamp+".png ");
+        cal_txt[i] = (timestamp + " " +  std::to_string(intrinsic(0,0)) + " " + std::to_string(intrinsic(1,1)) +" "+ std::to_string(intrinsic(0,2)) +" "+std::to_string(intrinsic(1,2)));
+        
         auto [ray_origin, ray_directions] = projector.ray_direction_per_image(intrinsic);
-                
-        std::vector<std::vector<vcg::Point3f>> ray_origin_ws = projector.image_to_mesh_space(extrinsic, ray_origin);    
-        std::vector<std::vector<vcg::Point3f>> ray_direction_ws = projector.image_to_mesh_space(extrinsic, ray_directions);    
+        
+        std::vector<std::vector<vcg::Point3f>> ray_origin_ws(ray_origin.size(), std::vector<vcg::Point3f>(ray_origin[0].size())); 
+        projector.image_to_mesh_space(ray_origin_ws, extrinsic, ray_origin);    
 
+        std::vector<std::vector<vcg::Point3f>> ray_direction_ws(ray_directions.size(), std::vector<vcg::Point3f>(ray_directions[0].size()));
+        projector.image_to_mesh_space(ray_direction_ws, extrinsic, ray_directions);    
+
+        //create_directory_if_not_exists(save_path+"/depth/"+"csv");
+        //mesh_handler.saveMatAsCSV(ray_origin_ws, save_path+"/depth/"+"csv/"+timestamp+"_ray_origin.csv");
+        //mesh_handler.saveMatAsCSV(ray_direction_ws, save_path+"/depth/"+"csv/"+timestamp+"_ray_direction.csv");
+        
         vcg::Point3f origin = ray_origin_ws[0][0];
 
         int rows = ray_direction_ws.size();
         int cols = ray_direction_ws[0].size();
 
-        std::vector<std::vector<vcg::Point3f>> direction(2, std::vector<vcg::Point3f>(2));
-        direction[0][0] = ray_direction_ws[0][0];
-        direction[0][1] = ray_direction_ws[0][cols-1];
-        direction[1][0] = ray_direction_ws[rows-1][0];
-        direction[1][1] = ray_direction_ws[rows-1][cols-1];
-
-        mesh_handler.visualize_points_in_mesh(origin, direction,test_mesh_path+timestamp+".ply", true);
+        auto [hit_something_mat, hit_coords_mat, hit_distances_mat, hit_face_id_mat] = mesh_handler.project_rays(ray_origin_ws, ray_direction_ws, false, false);
         
-        auto [hit_something_mat, hit_coords_mat, hit_distances_mat, hit_face_id_mat] = mesh_handler.project_rays(ray_origin, ray_direction_ws, false, false);
+        /*
+        std::vector<std::vector<vcg::Point3f>> hp_direction(2, std::vector<vcg::Point3f>(2));
+        hp_direction[0][0] = hit_coords_mat[0][0];
+        hp_direction[0][1] = hit_coords_mat[0][cols-1];
+        hp_direction[1][0] = hit_coords_mat[rows-1][0];
+        hp_direction[1][1] = hit_coords_mat[rows-1][cols-1];
 
-        //mesh_handler.saveMatAsCSV(hit_distances_mat, save_path+"depth/"+"csv/"+timestamp+"_hit_distance.csv");
-        //mesh_handler.saveMatAsCSV(hit_face_id_mat, save_path+"depth/"+"csv/"+timestamp+"hit_face_id_mat.csv");
-        mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.png");
+        //mesh_handler.visualize_points_in_mesh(origin, hp_direction, test_mesh_path+timestamp+"hp_d.ply", true, 10);
+        //mesh_handler.visualize_points_in_mesh(origin, hit_coords_mat, test_mesh_path+timestamp+"_hp_nd.ply", true, 1, true);
+        */
+        //mesh_handler.saveMatAsCSV(hit_distances_mat, save_path+"/depth/"+"csv/"+timestamp+"_hit_distance.csv");
+        //mesh_handler.saveMatAsCSV(hit_face_id_mat, save_path+"/depth/"+"csv/"+timestamp+"hit_face_id_mat.csv");
         
-        #pragma opm critical
-        done_images+=1;
+        mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.png", 5000);
+        mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.pfm");
+        
+        #pragma omp atomic
+        done_images += 1;
 
-        #pragma omp critical
-        std::cout<<"processed "<<std::setprecision(3) << std::fixed<< done_images/tuple_intrinsics.size()*100 << "% | "<<static_cast<int>(done_images)<<"/"<<tuple_intrinsics.size()<<"\r" << std::flush;
+        //if (int(done_images) % 5 == 0) {  // Print every 10 images
+            #pragma omp critical
+            {
+                std::cout << "processed " << std::setprecision(3) << std::fixed << done_images / tuple_intrinsics.size() * 100 << "% | " << static_cast<int>(done_images) << "/" << tuple_intrinsics.size() << "\r" << std::flush;
+            }
+        //}
     }
+
+    for (int i = 0; i < tuple_intrinsics.size(); i+=1){
+        Eigen::Matrix4d extrinsic = std::get<2>(tuple_intrinsics[i]);
+        make_gt_sim_from_extrinsics(extrinsic, save_path+"/odometry.gt.sim");
+    }
+
     cout<<""<<endl;
     save_to_txt(cal_txt, save_path, "/calibration.txt", true);
     save_to_txt(association, save_path, "/association.txt", true);
-    //make_gt_sim(raw_data_path+"pinhole_projection/odometry.log", save_path+"/odometry.gt.sim");
     make_yaml_file(save_path, std::get<1>(tuple_intrinsics[1]),"/dataconfigs/icl.yaml");
 }
 
-
 int main(int argc, char* argv[])
 {   
+    /*
+    cout<<"size of argc "<< argc <<endl;
+    if(argc != 0)
+        verbose = argv[0];
+
+    for(int i = 0; i< argc; i++)
+        cout<<"argv[i] "<< argv[i] << endl;
+    */
+    cout << "Making dataset..." << endl;
+    auto start = high_resolution_clock::now();
+
+    //make_dataset();
+    
     int start_id = std::atoi(argv[1]);
     int end_id = std::atoi(argv[2]);
     cout<<"size of argc "<< argc <<endl;
@@ -282,4 +270,7 @@ int main(int argc, char* argv[])
     make_dataset(start_id, end_id);
     cout<<"done range: "<< start_id << " to "<< end_id <<endl;
 
+    auto end = high_resolution_clock::now();
+    duration<double> elapsed = end - start;
+    cout << endl << "Making dataset took " << elapsed.count() << " seconds" << endl;
 }

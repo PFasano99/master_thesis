@@ -4,8 +4,8 @@
         - run_only, if true the script will only run from a previously build image;
         - delate_container, if true all the container from the image will be delated;
 '
-build_only=false
-run_only=false
+build_only=true
+run_only=true
 delate_container=true
 
 while [[ $# -gt 0 ]]; do
@@ -42,7 +42,7 @@ if [[ "$run_only" == true ]]; then
     c=0
 
     # Loop over the range of numbers from 1 to 1800
-    for ((i = 0; i <= 1800; i+=50)); do
+    for ((i = 0; i <= 1800; i+=200)); do
         trap 'echo "SIGINT received, stopping loop"; exit' INT
         # Call the compiled C++ program with the current number as argument
         docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth "$c" "$i"
@@ -50,6 +50,9 @@ if [[ "$run_only" == true ]]; then
     done
 
     docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth 1800 1803
+
+
+    #docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth
    
     if [[ "$delate_container" == true ]]; then
         echo "Delating container of image Paolo.Fasano/tesi_image:cpp"

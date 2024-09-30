@@ -1,10 +1,4 @@
 #include <iostream>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/core/core.hpp>
-#include <opencv2/core/mat.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/highgui.hpp>
 #include <vector>
 #include <fstream>
 #include <filesystem>
@@ -12,33 +6,42 @@
 #include <chrono>
 #include <iomanip> //for precison of float in percentage print (not stricltly necessary)
 
+#include <time.h>
+
+
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/core/mat.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/core/affine.hpp>
+#include <Eigen/Dense> //#include <Eigen/Dense> this must be included before #include <opencv2/core/eigen.hpp> 
+#include <opencv2/core/eigen.hpp>
+
+
+
+//imports for mesh handling
 #include <vcg/complex/complex.h>
 #include <vcg/complex/algorithms/create/platonic.h>
 #include <vcg/complex/algorithms/update/color.h>
 
-#include <Eigen/Dense>
 
 //import export
 #include<wrap/io_trimesh/import.h>
 #include<wrap/io_trimesh/export.h>
-#include <wrap/io_trimesh/export_off.h>
-#include <wrap/io_trimesh/export_ply.h>
-#include <wrap/io_trimesh/import_ply.h>
-#include <wrap/io_trimesh/import_off.h>
 
-
-#include <time.h>
 #include <vcg/math/gen_normal.h>
 #include <vcg/complex/allocate.h>
 
 //vcgLibForEmbree
 #include<wrap/embree/EmbreeAdaptor.h>
 
-#include <opencv2/core/affine.hpp>
-#include <opencv2/core/eigen.hpp>
 
 using namespace std;
 using namespace vcg;
+using namespace std::chrono;
+
 
 class Project_point
 {
@@ -64,21 +67,18 @@ class Project_point
         }
 
     public:
-        vcg::Point3f Unproject(const vcg::Point2f &point, const double &Z, Eigen::Matrix3d intrinsic)
+        void Unproject(vcg::Point3f& result, const vcg::Point2f &point, const double &Z, const Eigen::Matrix3d& intrinsic)
         {
             double f_x = intrinsic(0,0);
             double f_y = intrinsic(1,1);
             double c_x = intrinsic(0,2);
             double c_y = intrinsic(1,2);
-
-            vcg::Point3f result;
            
-            float z = Z; 
-            float x = ((point[0]-c_x)/f_x) * z;
-            float y = ((point[1]-c_y)/f_y) * z;
+            //cout << "fx " << f_x << " fy " << f_y << " cx " << c_x << " cy " << c_y << endl;
 
-            result = vcg::Point3f(x,y,z);
-            return result;
+            result[0] = ((point[0]-c_x)/f_x) * Z;
+            result[1] = ((point[1]-c_y)/f_y) * Z;
+            result[2] = Z; 
         }
 
     
@@ -97,9 +97,10 @@ class Project_point
 
     */
     public:
-        std::vector<std::tuple<long long, double, double, Eigen::Matrix4d, double, double, int, int>> load_pv_data(const std::string &csv_path)
+        std::vector<std::tuple<long long, Eigen::Matrix4d, Eigen::Matrix3d, int, int>> load_pv_data(const std::string &csv_path)
         {
-            std::vector<std::tuple<long long, double, double, Eigen::Matrix4d, double, double, int, int>> pv_data;
+
+            std::vector<std::tuple<long long, Eigen::Matrix4d, Eigen::Matrix3d, int, int>> pv_data;
             std::ifstream file(csv_path);
             if (!file.is_open())
             {
@@ -144,7 +145,15 @@ class Project_point
                     }
                 }
 
-                pv_data.push_back(std::make_tuple(frame_timestamps, focal_length_x, focal_length_y, pv2world_transforms, intrinsics_ox, intrinsics_oy, intrinsics_width, intrinsics_height));                
+                Eigen::Matrix3d K = Eigen::Matrix3d::Zero(); //(3, std::vector<double>(3, 0.0));
+                K(0,0) = focal_length_x;
+                K(1,1) = focal_length_y;
+                K(0,2) = intrinsics_ox;
+                K(1,2) = intrinsics_oy;
+                K(2,2) = 1.0;
+                
+
+                pv_data.push_back(std::make_tuple(frame_timestamps, pv2world_transforms, K, intrinsics_width, intrinsics_height));                
             }
 
             return pv_data; 
@@ -182,45 +191,18 @@ class Project_point
                 throw std::runtime_error("no *pv.txt file found in path " + string(folder) + " check path. ");
             }
             
-
             std::filesystem::path pv_folder = folder / "PV";
             if (!std::filesystem::exists(pv_folder) || !std::filesystem::is_directory(pv_folder))
             {
                 throw std::runtime_error("PV folder does not exist or is not a directory");
             }
 
-            std::vector<std::filesystem::path> pv_timestamps;
-            for (const auto &entry : std::filesystem::directory_iterator(pv_folder))
-            {
-                if (entry.path().extension() == ".png")
-                {
-                    pv_timestamps.push_back(entry.path().filename().string());
-                }
-            }
-
-            if (pv_timestamps.empty())
-            {
-                throw std::runtime_error("No PNG files found in the PV folder");
-            }
-
-
-            std::vector<std::tuple<long long, double, double, Eigen::Matrix4d, double, double, int, int>> pv_data = load_pv_data(path_to_pv);
-
-            int n_frames = pv_timestamps.size();
+            std::vector<std::tuple<long long, Eigen::Matrix4d, Eigen::Matrix3d, int, int>> pv_data = load_pv_data(path_to_pv);            
             std::vector<std::tuple<long long, Eigen::Matrix3d, Eigen::Matrix4d>> intrinsic_per_image;
 
-            for (int pv_id = 0; pv_id < n_frames; pv_id++)
+            for (int pv_id = 0; pv_id < pv_data.size(); pv_id++)
             {
-                auto [frame_timestamp, focal_length_x, focal_length_y, pv2world_transforms, ox, oy, width, height] = pv_data[pv_id]; 
-              
-                // Create the intrinsic matrix K
-                Eigen::Matrix3d K = Eigen::Matrix3d::Zero(); //(3, std::vector<double>(3, 0.0));
-                K(0,0) = focal_length_x;
-                K(1,1) = focal_length_y;
-                K(0,2) = ox;
-                K(1,2) = oy;
-                K(2,2) = 1.0;
-                
+                auto [frame_timestamp, pv2world_transforms, K, width, height] = pv_data[pv_id]; 
                 intrinsic_per_image.push_back(std::make_tuple(frame_timestamp, K, pv2world_transforms));
             }
 
@@ -284,13 +266,13 @@ class Project_point
             int cols = image_width;
 
             std::vector<std::vector<vcg::Point3f>> ray_directions(rows, std::vector<vcg::Point3f>(cols));
-            std::vector<std::vector<vcg::Point3f>> ray_origins(rows, std::vector<vcg::Point3f>(cols));
+            std::vector<std::vector<vcg::Point3f>> ray_origins(rows, std::vector<vcg::Point3f>(cols, vcg::Point3f(0.0f,0.0f,0.0f)));
 
 
             for(int r = 0; r < rows; r++){
                 for(int c = 0; c < cols; c++){
-                    ray_directions[r][cols-c-1] = Unproject(vcg::Point2f(c+0.5f, r+0.5f), -1, intrinsic);
-                    ray_origins[r][cols-c-1] = vcg::Point3f(0.0f,0.0f,0.0f);
+                    Unproject(ray_directions[r][cols-c-1], vcg::Point2f(c+0.5f, r+0.5f), -1, intrinsic);
+                    //ray_origins[r][cols-c-1] = vcg::Point3f(0.0f,0.0f,0.0f);
                 }
 
             } 
@@ -310,19 +292,16 @@ class Project_point
 
     */
     public:
-        std::vector<std::vector<vcg::Point3f>> image_to_mesh_space(const Eigen::Matrix4d &extrinsic, const std::vector<std::vector<vcg::Point3f>> &image_directions) {
+        void image_to_mesh_space(std::vector<std::vector<vcg::Point3f>>& world_space_directions, const Eigen::Matrix4d &extrinsic, const std::vector<std::vector<vcg::Point3f>> &image_directions) {
+            
             int rows = image_directions.size();
             int cols = image_directions[0].size();
-            
-            std::vector<std::vector<vcg::Point3f>> world_space_directions(rows, std::vector<vcg::Point3f>(cols));
-            
+
             for (int r = 0; r < rows; r++) {
                 for (int c = 0; c < cols; c++) {
-                    world_space_directions[r][c] = coord_to_mesh_space(extrinsic, image_directions[r][c]);
+                    coord_to_mesh_space(world_space_directions[r][c], extrinsic, image_directions[r][c]);
                 }
             }
-
-        return world_space_directions;
     }
 
     /*
@@ -342,26 +321,21 @@ class Project_point
 
     */
     public:
-        vcg::Point3f coord_to_mesh_space(const Eigen::Matrix4d &extrinsic, const vcg::Point3f& coords){
+        void coord_to_mesh_space(vcg::Point3f& worldCoords, const Eigen::Matrix4d &extrinsic, const vcg::Point3f& coords){
             // Formulate camera coordinates as a homogeneous 4x1 vector
-            Eigen::Vector4d cameraCoordsHomogeneous;
-            cameraCoordsHomogeneous << coords[0], coords[1], coords[2], 1.0f;
-
+            Eigen::Vector4d cameraCoordsHomogeneous(coords[0], coords[1], coords[2], 1.0f);
+            //cameraCoordsHomogeneous << coords[0], coords[1], coords[2], 1.0f;
             Eigen::Vector4d worldCoordsHomogeneous = extrinsic * cameraCoordsHomogeneous;
 
             // Normalize the homogeneous coordinates
-            vcg::Point3f worldCoords(
-                (worldCoordsHomogeneous(0) / worldCoordsHomogeneous(3)),
-                (worldCoordsHomogeneous(1) / worldCoordsHomogeneous(3)),
-                (worldCoordsHomogeneous(2) / worldCoordsHomogeneous(3))
-            );
-
-            return worldCoords;
+            worldCoords[0] = (worldCoordsHomogeneous(0) / worldCoordsHomogeneous(3));
+            worldCoords[1] = (worldCoordsHomogeneous(1) / worldCoordsHomogeneous(3));
+            worldCoords[2] = (worldCoordsHomogeneous(2) / worldCoordsHomogeneous(3));
         }
 
     public: 
         void print_frame_pv(long long timestamp, string path_to_pv){
-            std::vector<std::tuple<long long, double, double, Eigen::Matrix4d, double, double, int, int>> pv_data = load_pv_data(path_to_pv);
+            std::vector<std::tuple<long long, Eigen::Matrix4d, Eigen::Matrix3d, int, int>> pv_data = load_pv_data(path_to_pv);
             print_frame_pv(timestamp, pv_data);
         }
     
@@ -369,19 +343,18 @@ class Project_point
         This method is a support method to print the values of a specific timestamp extracted from the *_pv.txt file 
     */
     public:
-        void print_frame_pv(long long timestamp, std::vector<std::tuple<long long, double, double, Eigen::Matrix4d, double, double, int, int>> &pv_data){
+        void print_frame_pv(long long timestamp, std::vector<std::tuple<long long, Eigen::Matrix4d, Eigen::Matrix3d, int, int>> &pv_data){
             for (int i = 0; i < pv_data.size(); i++){
-                auto [frame_timestamps, focal_length_x, focal_length_y, pv2world_transforms, ox, oy, width, height] = pv_data[i]; 
+                auto [frame_timestamps, pv2world_transforms, K, width, height] = pv_data[i]; 
                 
                 if (frame_timestamps==timestamp){
                     std::cout << "timestamp " << frame_timestamps << endl;
-                    std::cout << "focal x " << focal_length_x << endl;
-                    std::cout << "focal y " << focal_length_y << endl;
-                    std::cout << "ox " << ox << endl;
-                    std::cout << "oy " << oy << endl;
+                    std::cout << "focal x " << K(0,0) << endl;
+                    std::cout << "focal y " << K(1,1) << endl;
+                    std::cout << "ox " << K(0,2) << endl;
+                    std::cout << "oy " << K(1,2) << endl;
                     std::cout << "width " << width << endl;
-                    std::cout << "height " << height << endl;
-
+                    std::cout << "height " << height << endl;                 
 
                     // Print the vector
                     for (int i = 0; i < pv2world_transforms.rows(); ++i) {
@@ -400,8 +373,6 @@ class Project_point
         }
 };
 
-
-using namespace vcg; 
 
 class HandleMesh{
 
@@ -434,9 +405,9 @@ class HandleMesh{
             int ret = tri::io::ImporterOFF<MyMesh>::Open(loaded_mesh,path_to_ply.c_str());
             if(ret!=tri::io::ImporterOFF<MyMesh>::NoError)
             {
-                printf("Error loading the mesh from: %s \n", path_to_ply.c_str());
-                exit(0);
+                throw std::runtime_error("Error loading the mesh from: " + path_to_ply);
             }
+
             if (verbose)
                 printf("Mesh loaded correctly. \n");
             vcg::tri::Append<MyMesh,MyMesh>::MeshCopy(mesh,loaded_mesh);
@@ -477,63 +448,37 @@ class HandleMesh{
             
             int total_iterations = rows;
             int progress = 0;
-
+            float scale = 100.0f;
             EmbreeAdaptor<MyMesh> adaptor = EmbreeAdaptor<MyMesh>(mesh);
 
-            if (use_omp){
-                omp_set_num_threads(n_threads);
-                #pragma omp parallel for
-                for(int r = 0; r < rows; r++){
-                    progress++;
-                    for(int c = 0; c < cols; c++){
-                        vcg::Point3f origin = origins[r][c];
-                        vcg::Point3f direction = directions[r][c]; 
+            for(int r = 0; r < rows; r++){
+                progress++;
+                for(int c = 0; c < cols; c++){
+                    vcg::Point3f origin = origins[r][c];
 
-                        float tnear = std::sqrt(std::pow(direction[0] - origin[0], 2) + std::pow(direction[1] - origin[1], 2) + std::pow(direction[2] - origin[2], 2));
-                        auto [hit_something, hit_face_coords, hit_distance, id] = adaptor.shoot_ray(origin, direction, tnear, false);
-                        
-                        #pragma omp critical
-                        hit_something_mat[r][c] = hit_something;
-                        #pragma omp critical
-                        hit_coords_mat[r][c] = hit_face_coords;
-                        if (hit_distance != std::numeric_limits<float>::infinity())
-                            #pragma omp critical
-                            hit_distances_mat[r][c] = hit_distance;
-                        else
-                            #pragma omp critical
-                            hit_distances_mat[r][c] = 0;
-                        #pragma omp critical
-                        hit_face_id_mat[r][c] = id;
-    
-                    }
+                    Point3f direction = directions[r][c];
+                    Point3f scaledDirection(origin[0] + ((direction[0]-origin[0])*scale),origin[1] + ((direction[1]-origin[1])*scale), origin[2] + ((direction[2]-origin[2])*scale));
 
-                    if (progress % 10 == 0 && log)
-                        std::cout << "Progress: " << progress << "/"<<rows<<endl;
+                    direction = scaledDirection;
+
+                    direction.Normalize();
+                    float tnear = 0.00001f; //std::sqrt(std::pow(direction[0] - origin[0], 2) + std::pow(direction[1] - origin[1], 2) + std::pow(direction[2] - origin[2], 2));
+                    auto [hit_something, hit_face_coords, hit_distance, id] = adaptor.shoot_ray(origin, direction, tnear, false);
+                
+                    hit_something_mat[r][c] = hit_something;
+                    if (hit_distance != std::numeric_limits<float>::infinity())
+                        hit_distances_mat[r][c] = hit_distance;
+                    else
+                        hit_distances_mat[r][c] = 0;
+                    
+                    hit_coords_mat[r][c] = hit_face_coords;
+                    
+                    hit_face_id_mat[r][c] = id;
+
                 }
-            }
-            else{
-                for(int r = 0; r < rows; r++){
-                    progress++;
-                    for(int c = 0; c < cols; c++){
-                        vcg::Point3f origin = origins[r][c];
-                        vcg::Point3f direction = directions[r][c]; 
 
-                        float tnear = 0.01f; //std::sqrt(std::pow(direction[0] - origin[0], 2) + std::pow(direction[1] - origin[1], 2) + std::pow(direction[2] - origin[2], 2));
-                        auto [hit_something, hit_face_coords, hit_distance, id] = adaptor.shoot_ray(origin, direction, tnear, false);
-                        
-                        hit_something_mat[r][c] = hit_something;
-                        hit_coords_mat[r][c] = hit_face_coords;
-                        if (hit_distance != std::numeric_limits<float>::infinity())
-                            hit_distances_mat[r][c] = hit_distance;
-                        else
-                            hit_distances_mat[r][c] = 0;
-                        hit_face_id_mat[r][c] = id;
-    
-                    }
-
-                    if (progress % 10 == 0 && log)
-                        std::cout << "Progress: " << progress << "/"<<rows<<endl;
-                }
+                if (progress % 10 == 0 && log)
+                    std::cout << "Progress: " << progress << "/"<<rows<<endl;
             }
         
             if (log){
@@ -543,7 +488,9 @@ class HandleMesh{
                 std::cout << "size of hit_distances_mat " << hit_distances_mat.size() << "x" << hit_distances_mat[0].size() << endl;
                 std::cout << "size of hit_face_id_mat " << hit_face_id_mat.size() << "x" << hit_face_id_mat[0].size() << endl;
             }
-                
+            
+            //I make sure to release the resources once the ray shooting has finished 
+            adaptor.release_global_resources();
             return std::make_tuple(hit_something_mat, hit_coords_mat, hit_distances_mat, hit_face_id_mat);
         }    
 
@@ -551,9 +498,15 @@ class HandleMesh{
         std::tuple<bool, Point3f, float, int> project_rays(vcg::Point3f origin, vcg::Point3f direction){
 
             EmbreeAdaptor<MyMesh> adaptor = EmbreeAdaptor<MyMesh>(mesh);
-            float tnear = std::sqrt(std::pow(direction[0] - origin[0], 2) + std::pow(direction[1] - origin[1], 2) + std::pow(direction[2] - origin[2], 2));
-
-            return adaptor.shoot_ray(origin, direction, tnear, true);
+            float scale = 100.0f;
+            Point3f scaledDirection(origin[0] + ((direction[0]-origin[0])*scale),origin[1] + ((direction[1]-origin[1])*scale), origin[2] + ((direction[2]-origin[2])*scale));
+            direction = scaledDirection;
+            direction.Normalize();
+            
+            float tnear = 0.00001f; //std::sqrt(std::pow(direction[0] - origin[0], 2) + std::pow(direction[1] - origin[1], 2) + std::pow(direction[2] - origin[2], 2));
+            //print_point3f(origin,"origin");
+            //print_point3f(direction, "direction");
+            return adaptor.shoot_ray(origin, direction, tnear, true, true);
 
         }    
 
@@ -625,6 +578,77 @@ class HandleMesh{
             mask |= vcg::tri::io::Mask::IOM_EDGEINDEX;
             tri::io::ExporterPLY<MyMesh>::Save(mesh2, file_name.c_str(), mask);
         }
+    
+    public:
+        void visualize_points_in_mesh(vcg::Point3f &origin, std::vector<std::vector<vcg::Point3f>> &directions, string file_name, bool use_edge, float scale, bool all_edges = false){
+
+            int rows = directions.size();
+            int cols = directions[0].size();
+            MyMesh mesh2;
+            vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, origin);
+
+            for(int r = 0; r < rows; r++){
+                for(int c = 0; c < cols; c++){
+                    vcg::Point3f direction = directions[r][c];
+                    /*              
+                    Point3D newCoordinate = new Point3D { 
+                                        A.X + ((B.X - A.X) * distanceToAdjust),
+                                        A.Y + ((B.Y - A.Y) * distanceToAdjust),
+                                        A.Z + ((B.Z - A.Z) * distanceToAdjust)
+                                    }
+                    */
+                    Point3f scaledDirection(origin[0] + ((direction[0]-origin[0])*scale),origin[1] + ((direction[1]-origin[1])*scale), origin[2] + ((direction[2]-origin[2])*scale));
+                    vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, scaledDirection);
+                }
+            }
+
+            if(use_edge){
+                // Add a face between the two vertices
+                if(all_edges){
+                    for(int i = 1; i < mesh2.vert.size(); i++){
+                        vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[0], &mesh2.vert[i]);
+                    }
+                }
+                else{
+
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[0], &mesh2.vert[1]);
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[0], &mesh2.vert[cols+1]);
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[0], &mesh2.vert[mesh2.vert.size()-1-cols]);
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[0], &mesh2.vert[mesh2.vert.size()-1]);
+
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[1], &mesh2.vert[cols+1]);
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[1], &mesh2.vert[mesh2.vert.size()-1-cols]);
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[mesh2.vert.size()-1-cols], &mesh2.vert[mesh2.vert.size()-1]);
+                    vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[mesh2.vert.size()-1], &mesh2.vert[cols+1]);
+                }
+                
+            }
+
+            int mask = vcg::tri::io::Mask::IOM_VERTCOORD;
+            mask |= vcg::tri::io::Mask::IOM_EDGEINDEX;
+            tri::io::ExporterPLY<MyMesh>::Save(mesh2, file_name.c_str(), mask);
+        }
+
+    public:
+        void visualize_points_in_mesh(vcg::Point3f &origin, vcg::Point3f& direction, string file_name, bool use_edge, float scale){
+
+            MyMesh mesh2;
+            vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, origin);
+
+            Point3f scaledDirection(origin[0] + ((direction[0]-origin[0])*scale),origin[1] + ((direction[1]-origin[1])*scale), origin[2] + ((direction[2]-origin[2])*scale));
+            vcg::tri::Allocator<MyMesh>::AddVertex(mesh2, scaledDirection);
+
+
+            if(use_edge){
+                // Add a face between the two vertices
+                vcg::tri::Allocator<MyMesh>::AddEdge(mesh2, &mesh2.vert[0], &mesh2.vert[1]);                
+            }
+
+            int mask = vcg::tri::io::Mask::IOM_VERTCOORD;
+            mask |= vcg::tri::io::Mask::IOM_EDGEINDEX;
+            tri::io::ExporterPLY<MyMesh>::Save(mesh2, file_name.c_str(), mask);
+        }
+
 
     public:
         void visualize_points_in_mesh(vcg::Point3f &origin, std::vector<vcg::Point3f> &directions, string file_name = "./resources/test_OriginDirections.off"){
@@ -675,7 +699,7 @@ class HandleMesh{
             ofstream file(filename);
 
             if (!file.is_open()) {
-                cerr << "Error: Unable to open file for writing!" << endl;
+                cerr << "Error: Unable to open file for writing! in: saveMatAsCSV Eigen::MatrixXf" << endl;
                 return;
             }
 
@@ -702,7 +726,7 @@ class HandleMesh{
             ofstream file(filename);
 
             if (!file.is_open()) {
-                cerr << "Error: Unable to open file for writing!" << endl;
+                cerr << "Error: Unable to open file for writing! in: saveMatAsCSV vector<vector<int>>" << endl;
                 return;
             }
 
@@ -731,7 +755,7 @@ class HandleMesh{
             ofstream file(filename);
 
             if (!file.is_open()) {
-                cerr << "Error: Unable to open file for writing!" << endl;
+                cerr << "Error: Unable to open file for writing! in: saveMatAsCSV vector<vector<float>>" << endl;
                 return;
             }
 
@@ -760,7 +784,7 @@ class HandleMesh{
             ofstream file(filename);
 
             if (!file.is_open()) {
-                cerr << "Error: Unable to open file for writing!" << endl;
+                cerr << "Error: Unable to open CSV file for writing! in: saveMatAsCSV vector<vector<bool>> " << endl;
                 return;
             }
 
@@ -790,7 +814,7 @@ class HandleMesh{
             ofstream file(filename);
 
             if (!file.is_open()) {
-                cerr << "Error: Unable to open file for writing!" << endl;
+                cerr << "Error: Unable to open file for writing! in: saveMatAsCSV vector<vector<vcg::Point3f>>" << endl;
                 return;
             }
 
@@ -820,22 +844,27 @@ class HandleMesh{
         void saveFloatMatAsGrayscaleImage(const std::vector<std::vector<float>> &floatMat, const std::string& filename) {
             int rows = floatMat.size();
             int cols = floatMat[0].size();
-            cv::Mat matrix(rows, cols, CV_16UC1);
+            cv::Mat matrix(rows, cols, CV_32FC1);//CV_16UC1
             for(int r = 0; r < rows; r++){
                 for(int c = 0; c < cols; c++){
-                    matrix.at<ushort>(r, c) = floatMat[r][c] * 5000; 
+                    matrix.at<float>(r, c) = floatMat[r][c]; //* 5000; 
                 }
             }
 
-            //matrix *= 5000;
+            cv::imwrite(filename, matrix);
+        }
 
-            // Normalize the matrix to the range [0, 255]
-            //cv::normalize(matrix, matrix, 0, 255, cv::NORM_MINMAX);
-            
-            // Convert to 16-bit grayscale image
-            //cv::Mat grayscaleImage;
-            //matrix.convertTo(grayscaleImage, CV_16U);
-            //saveMatAsCSV(zerosMat, "./resources/scaledMatrix_f.csv");
+    public:
+        void saveFloatMatAsGrayscaleImage(const std::vector<std::vector<float>> &floatMat, const std::string& filename, float depth_scale) {
+            int rows = floatMat.size();
+            int cols = floatMat[0].size();
+            cv::Mat matrix(rows, cols, CV_16UC1);//CV_16UC1
+            for(int r = 0; r < rows; r++){
+                for(int c = 0; c < cols; c++){
+                    matrix.at<ushort>(r, c) = floatMat[r][c] * depth_scale; 
+                }
+            }
+
             cv::imwrite(filename, matrix);
         }
 
@@ -868,11 +897,20 @@ class HandleMesh{
 
 
     public:
-        void print_point3f(vcg::Point3f& point, bool vertical = false){
+        void print_point3f(vcg::Point3f& point, string message="", bool vertical = false){
             if(vertical)
-                cout<<"x: " << point[0] << "\ny: " << point[1] << "\nz: " << point[2] << endl;
+                cout<<message<<"\nx: " << point[0] << "\ny: " << point[1] << "\nz: " << point[2] << endl;
             else
-                cout<<"x: " << point[0] << " y: " << point[1] << " z: " << point[2] << endl;
+                cout<<message<<" x: " << point[0] << " y: " << point[1] << " z: " << point[2] << endl;
+
+        } 
+
+    public:
+        void print_point2f(vcg::Point2f& point, string message="", bool vertical = false){
+            if(vertical)
+                cout<<message<<"\nx: " << point[0] << "\ny: " << point[1] << endl;
+            else
+                cout<<message<<" x: " << point[0] << " y: " << point[1] << endl;
 
         } 
 

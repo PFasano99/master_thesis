@@ -29,6 +29,7 @@ include_directories(
 set(SOURCES
     ./build_vertex_dic.cpp
     ./build_vertex_dic.h
+    ./build_vertex_unit_tests.h
     ${BUILD_DEPTH_DIR}/build_depth.h
     ${VCG_INCLUDE_DIRS}/wrap/ply/plylib.cpp)
 

@@ -16,8 +16,14 @@ RUN apt-get update && apt-get install -y \
     libglfw3-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Cloning and installing opencv
+RUN git clone https://github.com/opencv/opencv.git && \
+cd ./opencv && mkdir build && cd build && \
+cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \
+make -j"$(nproc)" && \
+make install  && ldconfig
 
-# Cloning and installing intel embree3 to use in th eVcglib
+# Cloning and installing intel embree4 to use in th eVcglib
 RUN git clone https://github.com/embree/embree.git && \
     cd ./embree && mkdir build && cd build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \
@@ -25,16 +31,10 @@ RUN git clone https://github.com/embree/embree.git && \
     make install  && ldconfig
 
 # Clone VCGlib repository from the devel branch and build FOR NOW I CLONE FROM MY OWN REPO FOR SOME CHANGES IN EmbreeAdaptor.h
-RUN git clone https://github.com/PFasano99/vcglib.git && \
+# ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+RUN git clone -b embree https://github.com/PFasano99/vcglib.git && \
     cd ./vcglib && mkdir build  && cd build 
 
-# Cloning and installing opencv
-RUN git clone https://github.com/opencv/opencv.git && \
-    cd ./opencv && mkdir build && cd build && \
-    cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \
-    make -j"$(nproc)" && \
-    make install  && ldconfig
-   
 # Copy the C++ files into the container
 COPY ./build_depth.cpp ./build_depth/build_depth.cpp
 COPY ./build_depth.h ./build_depth/build_depth.h

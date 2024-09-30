@@ -73,7 +73,7 @@ if [[ "$build_vertex_image" == true ]]; then
     echo "Building Paolo.Fasano/tesi_image:cpp_vertex_dic"
     cd ../build_vertex_dic
     ./run_vertex_dic.sh --build_only true
-    cd ../build_vertex_dic
+    cd ../demo_query
 else
     echo "Using prexisting Paolo.Fasano/tesi_image:cpp_vertex_dic"
 fi

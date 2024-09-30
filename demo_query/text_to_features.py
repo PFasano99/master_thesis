@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     tokenizer = open_clip.get_tokenizer(open_clip_model)
 
-    prompt_texts = ["table","show me a table", "where can i sit", "where is the kitchen?"]
+    prompt_texts = ["where are the doors?","table","show me a table", "where can i sit", "where is the kitchen?"]
 
     save_path = "./resources/dataset/cnr_c60/prompt_feat"
 

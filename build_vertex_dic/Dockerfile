@@ -22,6 +22,7 @@ RUN pip3 install -r ./build_vertex_dic/requirements.txt
 # Copy the C++ files into the container
 COPY ./build_vertex_dic.cpp ./build_vertex_dic/build_vertex_dic.cpp
 COPY ./build_vertex_dic.h ./build_vertex_dic/build_vertex_dic.h
+COPY ./build_vertex_unit_tests.h ./build_vertex_dic/build_vertex_unit_tests.h
 COPY ./CMakeLists.txt ./build_vertex_dic/CMakeLists.txt
 
 COPY ./bin_to_png.py ./build_vertex_dic/bin_to_png.py
