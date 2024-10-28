@@ -112,7 +112,6 @@ class Unit_Test_BV{
                 return true;
             return false;
         } 
-        
 
     public:
         bool test_get_values_from_coords(const Eigen::Tensor<float, 3>& tensor, int x, int y, bool expected_result, string message = "Retrive Eigen::Tensor<float, 1> from Eigen::Tensor<float, 3>"){
@@ -129,7 +128,6 @@ class Unit_Test_BV{
             
             return false;
         }
-
 
     public:
         bool test_concatenate_features(string path_to_mesh, vector<string> timestamps, string path_to_pv, string path_to_depth_folder, string clip_feat_path, string json_save_path, bool normalize_tensor, string path_to_features, bool expected_result, string message = "Testing sum and normalization"){
@@ -226,6 +224,85 @@ class Unit_Test_BV{
             
             return false;            
 
+        }
+
+    /*
+        this method confronts the result of the projection of an image, the vertex ids obtained, against an oracle
+    */
+    public:
+        bool test_projected_point(string path_to_oracle, string path_to_mesh, vector<string> timestamps, string path_to_pv, string path_to_depth_folder, string clip_feat_path, string json_save_path, bool expected_result, string message = "Testing projected points validitiy"){
+            std::vector<int> validIds = readValidIdsFromTxt(path_to_oracle);
+
+            map<long long, map<int, vector<vcg::Point2f>>> map_vertex;
+            projector.get_vetex_to_pixel_dict(map_vertex, path_to_pv, path_to_depth_folder, clip_feat_path, json_save_path, false);
+
+            std::vector<int> keys;
+
+            for(int ts = 0; ts < timestamps.size(); ts++){
+                for (const auto& pair : map_vertex[stoll(timestamps[ts])]) {
+                    keys.push_back(pair.first);  // Add the key (int) to the vector
+                }
+            }
+
+            int correct = 0;
+            bool result = true;
+            for(int i = 0; i < keys.size(); i++){
+                if(!(std::find(validIds.begin(), validIds.end(), keys[i]) != validIds.end())){
+                    //message += " Ids don't match"; 
+                    result = false;
+                }
+                else
+                    correct++;
+            }
+            
+            if(keys.size() != validIds.size()){
+                result = false;
+                message += " number of ids doesn't match, expected: "+to_string(validIds.size())+" got: "+ to_string(keys.size());
+            }
+
+            message+= " | correct indexes: " +to_string(correct)+"/"+to_string(validIds.size());
+
+            if (log_results)
+                add_result(result, expected_result, "test_projected_point", message);                 
+
+            if (result == expected_result)
+                return true;
+            
+            return false;                  
+
+        }
+
+    public:
+        bool test_allFeats_ogData(string path_to_allFeats, string path_to_og, string path_to_coords, bool expected_result, string message = "Testing original features agianst the all_feats.bin features"){
+
+            std::vector<Eigen::Tensor<float, 1>> all_tensors;            
+            projector.load_all_tensors_from_bin(all_tensors, path_to_allFeats, 1024);
+
+            Eigen::Tensor<float, 3> og_data;
+            projector.load_tensor_from_binary(og_data, path_to_og);
+
+            map<int, vcg::Point2f> coords;
+            projector.read_file_to_map(path_to_coords, coords);
+            
+            bool result = false;
+
+            for(auto it = coords.cbegin(); it != coords.cend(); ++it){
+                int key = it->first;
+                vcg::Point2f coord = coords[key];
+
+                result = areTensorsEqual(all_tensors[key], og_data, coord[0], coord[1]);
+                if (result == false)
+                    break;
+            }
+
+
+            if (log_results)
+                add_result(result, expected_result, "test_allFeats_ogData", message);                 
+
+            if (result == expected_result)
+                return true;
+            
+            return false;     
         }
 
 
@@ -338,5 +415,24 @@ class Unit_Test_BV{
             for(int h = 0; h < tensor.dimension(0); h++){
                 tensor(h) = distr(gen);
             }
+        }
+    
+    public:
+        std::vector<int> readValidIdsFromTxt(const std::string& filePath) {
+            std::vector<int> valid_ids;
+            std::ifstream inputFile(filePath);
+
+            if (!inputFile.is_open()) {
+                std::cerr << "Error: Could not open file " << filePath << std::endl;
+                return valid_ids;
+            }
+
+            int value;
+            while (inputFile >> value) {
+                valid_ids.push_back(value);
+            }
+
+            inputFile.close();
+            return valid_ids;
         }
 };

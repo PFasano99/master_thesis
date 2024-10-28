@@ -82,7 +82,7 @@ if [[ "$build_only" == false ]]; then
     fi
     
     if [[ "$run_py" == true ]]; then
-        docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp_vertex_dic python3 ./build_vertex_dic/bin_to_png.py
+        docker run -it -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp_vertex_dic python3 ./build_vertex_dic/bin_to_png.py
     else
         echo "skipping py"
     fi

@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     tokenizer = open_clip.get_tokenizer(open_clip_model)
 
-    prompt_texts = ["where are the doors?","table","show me a table", "where can i sit", "where is the kitchen?"]
+    prompt_texts = ["where are the doors?","table", "where can i sit?", "where is the kitchen?"]
 
     save_path = "./resources/dataset/cnr_c60/prompt_feat"
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
         print(f'Folder created at: {save_path}')
 
     i=0
-    for prompt_text in prompt_texts[:1]:
+    for prompt_text in prompt_texts:
         text = tokenizer([prompt_text])
         textfeat = model.encode_text(text)
         textfeat = torch.nn.functional.normalize(textfeat.float(), dim=-1)

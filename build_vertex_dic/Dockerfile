@@ -26,6 +26,7 @@ COPY ./build_vertex_unit_tests.h ./build_vertex_dic/build_vertex_unit_tests.h
 COPY ./CMakeLists.txt ./build_vertex_dic/CMakeLists.txt
 
 COPY ./bin_to_png.py ./build_vertex_dic/bin_to_png.py
+COPY ./hl2_test.py ./build_vertex_dic/hl2_test.py
 
 RUN cd ./build_vertex_dic && mkdir build && cd build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D    CMAKE_INSTALL_PREFIX=/usr/local .. && \

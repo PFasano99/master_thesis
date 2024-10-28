@@ -3,3 +3,4 @@ torch
 tqdm
 opencv-python
 scikit-learn
+pathlib
