@@ -42,7 +42,7 @@ if [[ "$run_only" == true ]]; then
     c=0
 
     # Loop over the range of numbers from 1 to 1800
-    for ((i = 0; i <= 1800; i+=200)); do
+    for ((i = 0; i <= 1800; i+=900)); do
         trap 'echo "SIGINT received, stopping loop"; exit' INT
         # Call the compiled C++ program with the current number as argument
         docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp ./build_depth/build/build_depth "$c" "$i"

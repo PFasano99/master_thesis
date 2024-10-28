@@ -167,68 +167,78 @@ void make_dataset(int start_id, int end_id, string mesh_file_path = "./resources
     for (int i = done_images; i < end_id; i+=1){
         //tuple_intrinsics.size()
         string timestamp = "" + to_string(std::get<0>(tuple_intrinsics[i]));
-        Eigen::Matrix3d intrinsic = std::get<1>(tuple_intrinsics[i]);
-        Eigen::Matrix4d extrinsic = std::get<2>(tuple_intrinsics[i]);
         
-        //copying all the rgb.png files to the new dataset
-        try {
-            // Check if the source file exists
-            if (!filesystem::exists(raw_data_path+"PV/"+timestamp+".png")) {
-                std::cerr << "Error: Source file does not exist: " << raw_data_path+"PV/"+timestamp+".png" << std::endl;
+        //if(timestamp == "133468485245652555")
+        {
+
+            Eigen::Matrix3d intrinsic = std::get<1>(tuple_intrinsics[i]);
+            Eigen::Matrix4d extrinsic = std::get<2>(tuple_intrinsics[i]);
+            
+            Eigen::Matrix3d dif_intrinsic = intrinsic;
+            dif_intrinsic(0,2) = (1920 - intrinsic(0,2));
+            intrinsic = dif_intrinsic;
+
+            //copying all the rgb.png files to the new dataset
+            try {
+                // Check if the source file exists
+                if (!filesystem::exists(raw_data_path+"PV/"+timestamp+".png")) {
+                    std::cerr << "Error: Source file does not exist: " << raw_data_path+"PV/"+timestamp+".png" << std::endl;
+                }
+                // Copy the file
+                filesystem::copy_file(raw_data_path+"PV/"+timestamp+".png", save_path+"/rgb/"+timestamp+".png", filesystem::copy_options::overwrite_existing);
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
             }
-            // Copy the file
-            filesystem::copy_file(raw_data_path+"PV/"+timestamp+".png", save_path+"/rgb/"+timestamp+".png", filesystem::copy_options::overwrite_existing);
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+
+            association[i] = (std::to_string(i)+" "+ save_path+"/depth/"+timestamp+"_depth.png " + std::to_string(i)+" "+save_path+"/rgb/"+timestamp+".png ");
+            cal_txt[i] = (timestamp + " " +  std::to_string(intrinsic(0,0)) + " " + std::to_string(intrinsic(1,1)) +" "+ std::to_string(intrinsic(0,2)) +" "+std::to_string(intrinsic(1,2)));
+            
+            auto [ray_origin, ray_directions] = projector.ray_direction_per_image(intrinsic);
+            
+            std::vector<std::vector<vcg::Point3f>> ray_origin_ws(ray_origin.size(), std::vector<vcg::Point3f>(ray_origin[0].size())); 
+            projector.image_to_mesh_space(ray_origin_ws, extrinsic, ray_origin);    
+
+            std::vector<std::vector<vcg::Point3f>> ray_direction_ws(ray_directions.size(), std::vector<vcg::Point3f>(ray_directions[0].size()));
+            projector.image_to_mesh_space(ray_direction_ws, extrinsic, ray_directions);    
+
+            //create_directory_if_not_exists(save_path+"/depth/"+"csv");
+            //mesh_handler.saveMatAsCSV(ray_origin_ws, save_path+"/depth/"+"csv/"+timestamp+"_ray_origin.csv");
+            //mesh_handler.saveMatAsCSV(ray_direction_ws, save_path+"/depth/"+"csv/"+timestamp+"_ray_direction.csv");
+            
+            vcg::Point3f origin = ray_origin_ws[0][0];
+
+            int rows = ray_direction_ws.size();
+            int cols = ray_direction_ws[0].size();
+
+            auto [hit_something_mat, hit_coords_mat, hit_distances_mat, hit_face_id_mat] = mesh_handler.project_rays(ray_origin_ws, ray_direction_ws, false, false);
+            
+            
+            std::vector<std::vector<vcg::Point3f>> hp_direction(2, std::vector<vcg::Point3f>(2));
+            hp_direction[0][0] = ray_direction_ws[0][0];
+            hp_direction[0][1] = ray_direction_ws[0][cols-1];
+            hp_direction[1][0] = ray_direction_ws[rows-1][0];
+            hp_direction[1][1] = ray_direction_ws[rows-1][cols-1];
+
+            mesh_handler.visualize_points_in_mesh(origin, hp_direction, test_mesh_path+timestamp+"hp_d.ply", true, 3);
+            //mesh_handler.visualize_points_in_mesh(origin, hit_coords_mat, test_mesh_path+timestamp+"_hp_nd.ply", true, 1, true);
+            
+            //mesh_handler.saveMatAsCSV(hit_distances_mat, save_path+"/depth/"+"csv/"+timestamp+"_hit_distance.csv");
+            //mesh_handler.saveMatAsCSV(hit_face_id_mat, save_path+"/depth/"+"csv/"+timestamp+"hit_face_id_mat.csv");
+            
+            mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.png", 5000);
+            mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.pfm");
+            
+            #pragma omp atomic
+            done_images += 1;
+
+            //if (int(done_images) % 5 == 0) {  // Print every 10 images
+                #pragma omp critical
+                {
+                    std::cout << "processed " << std::setprecision(3) << std::fixed << done_images / tuple_intrinsics.size() * 100 << "% | " << static_cast<int>(done_images) << "/" << tuple_intrinsics.size() << "\r" << std::flush;
+                }
+            //}
         }
 
-        association[i] = (std::to_string(i)+" "+ save_path+"/depth/"+timestamp+"_depth.png " + std::to_string(i)+" "+save_path+"/rgb/"+timestamp+".png ");
-        cal_txt[i] = (timestamp + " " +  std::to_string(intrinsic(0,0)) + " " + std::to_string(intrinsic(1,1)) +" "+ std::to_string(intrinsic(0,2)) +" "+std::to_string(intrinsic(1,2)));
-        
-        auto [ray_origin, ray_directions] = projector.ray_direction_per_image(intrinsic);
-        
-        std::vector<std::vector<vcg::Point3f>> ray_origin_ws(ray_origin.size(), std::vector<vcg::Point3f>(ray_origin[0].size())); 
-        projector.image_to_mesh_space(ray_origin_ws, extrinsic, ray_origin);    
-
-        std::vector<std::vector<vcg::Point3f>> ray_direction_ws(ray_directions.size(), std::vector<vcg::Point3f>(ray_directions[0].size()));
-        projector.image_to_mesh_space(ray_direction_ws, extrinsic, ray_directions);    
-
-        //create_directory_if_not_exists(save_path+"/depth/"+"csv");
-        //mesh_handler.saveMatAsCSV(ray_origin_ws, save_path+"/depth/"+"csv/"+timestamp+"_ray_origin.csv");
-        //mesh_handler.saveMatAsCSV(ray_direction_ws, save_path+"/depth/"+"csv/"+timestamp+"_ray_direction.csv");
-        
-        vcg::Point3f origin = ray_origin_ws[0][0];
-
-        int rows = ray_direction_ws.size();
-        int cols = ray_direction_ws[0].size();
-
-        auto [hit_something_mat, hit_coords_mat, hit_distances_mat, hit_face_id_mat] = mesh_handler.project_rays(ray_origin_ws, ray_direction_ws, false, false);
-        
-        /*
-        std::vector<std::vector<vcg::Point3f>> hp_direction(2, std::vector<vcg::Point3f>(2));
-        hp_direction[0][0] = hit_coords_mat[0][0];
-        hp_direction[0][1] = hit_coords_mat[0][cols-1];
-        hp_direction[1][0] = hit_coords_mat[rows-1][0];
-        hp_direction[1][1] = hit_coords_mat[rows-1][cols-1];
-
-        //mesh_handler.visualize_points_in_mesh(origin, hp_direction, test_mesh_path+timestamp+"hp_d.ply", true, 10);
-        //mesh_handler.visualize_points_in_mesh(origin, hit_coords_mat, test_mesh_path+timestamp+"_hp_nd.ply", true, 1, true);
-        */
-        //mesh_handler.saveMatAsCSV(hit_distances_mat, save_path+"/depth/"+"csv/"+timestamp+"_hit_distance.csv");
-        //mesh_handler.saveMatAsCSV(hit_face_id_mat, save_path+"/depth/"+"csv/"+timestamp+"hit_face_id_mat.csv");
-        
-        mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.png", 5000);
-        mesh_handler.saveFloatMatAsGrayscaleImage(hit_distances_mat, save_path+"/depth/"+timestamp+"_depth.pfm");
-        
-        #pragma omp atomic
-        done_images += 1;
-
-        //if (int(done_images) % 5 == 0) {  // Print every 10 images
-            #pragma omp critical
-            {
-                std::cout << "processed " << std::setprecision(3) << std::fixed << done_images / tuple_intrinsics.size() * 100 << "% | " << static_cast<int>(done_images) << "/" << tuple_intrinsics.size() << "\r" << std::flush;
-            }
-        //}
     }
 
     for (int i = 0; i < tuple_intrinsics.size(); i+=1){
