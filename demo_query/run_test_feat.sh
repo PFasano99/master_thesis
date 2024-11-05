@@ -91,6 +91,7 @@ if [[ "$build_only" == false ]]; then
     cd ./build_depth
 
     if [[ "$run_py" == true ]]; then
+        echo "Transforming prompt into features"
         docker run -v "$(pwd)":/workspace/builded_cpp -v $path_to_data:/workspace/resources Paolo.Fasano/tesi_image:cpp_demo_query python3 ./demo_query/text_to_features.py
     else
         echo "skipping py"

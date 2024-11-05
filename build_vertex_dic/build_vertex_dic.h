@@ -911,9 +911,8 @@ class Project_vertex_to_image
             cout<<"     Processed "<< completion_percentage << "% | "<<static_cast<int>(done_timestamps)<<"/"<<timestamps.size()<<endl;          
             for (int i = 0; i<timestamps.size(); i++){//timestamps.size()
                 completion_percentage = (done_timestamps/timestamps.size())*100;
-                
+                cout << "" << endl;
                 std::cout<<"  Processing "<< completion_percentage << "% | "<<static_cast<int>(done_timestamps)<<"/"<<timestamps.size()<<": concatenate_features: " <<timestamps[i];
-                
                 Eigen::Tensor<float, 3> tensor(1080,1920,1024); 
                 tensor.setZero();
                 load_tensor_from_binary(tensor, path_to_features+"/"+timestamps[i]+".bin");
@@ -1262,7 +1261,7 @@ class Project_vertex_to_image
             cout<<"Building tensors.."<<endl;
             auto start = high_resolution_clock::now();
             std::vector<filesystem::path> bin_paths;
-            findFilesWithExtension(bin_paths, path_to_dataset+clip_feat_path, ".bin");
+            findFilesWithExtension(bin_paths, clip_feat_path, ".bin");
             vector<string> bin_timestamp;
             for (const auto& file : bin_paths) {
                 bin_timestamp.push_back(file.filename().stem().string());
@@ -1273,8 +1272,9 @@ class Project_vertex_to_image
             values.setZero();
             std::vector<Eigen::Tensor<float, 1>> tensors(mesh_handler.mesh.vert.size(), values);
 
-            concatenate_features(tensors, map_vertex, bin_timestamp, normalize_tensor);
-            saveTensorsToBinary(tensors, path_to_dataset+"cnr_c60/concat_feats/all_feats.bin");
+            //void concatenate_features(std::vector<Eigen::Tensor<float, 1>>& tensors, map<long long, map<int, vector<vcg::Point2f>>>& map_vertex, std::vector<string> timestamps, bool normalize_tensors = true, string path_to_features="./resources/dataset/cnr_c60/saved-feat", string path_to_json="./resources/dataset/cnr_c60/vertex_images_json"){
+            concatenate_features(tensors, map_vertex, bin_timestamp, normalize_tensor, clip_feat_path);
+            saveTensorsToBinary(tensors, clip_feat_path+"/dinoV2_all_feats.bin");
             
             if(save_single_tensors){
                 cout<<" Saving single tensors.."<<endl;

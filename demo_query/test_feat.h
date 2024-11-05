@@ -29,7 +29,7 @@ class Test_feat{
 
             if (load_features){
                 cout << "   Loading all features from bin"<<endl;
-                projector.load_all_tensors_from_bin(tensors, path_to_dataset+"cnr_c60/concat_feats/all_feats.bin", 1024);
+                projector.load_all_tensors_from_bin(tensors, path_to_dataset+path_to_feats, 1024);
             }
         }
     

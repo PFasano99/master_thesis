@@ -41,7 +41,18 @@ if __name__ == "__main__":
 
     tokenizer = open_clip.get_tokenizer(open_clip_model)
 
-    prompt_texts = ["where are the doors?","table", "where can i sit?", "where is the kitchen?"]
+    prompt_texts = [
+                    "Where are the doors?",
+                    "Is there a TV?",
+                    "Can I find my backpack?",
+                    "Do you see a whiteboard?",
+                    "Where can I sit?",
+                    "Where are the couches?",
+                    "Where is the left couch?",
+                    "Where is the kitchen?",
+                    "Where can I put the trash?",
+                    "Where is the gnome?"
+                    ]
 
     save_path = "./resources/dataset/cnr_c60/prompt_feat"
 

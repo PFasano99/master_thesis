@@ -20,9 +20,9 @@ int main(int argc, char* argv[])
     string path_to_depth_folder = "cnr_c60/depth";
     string json_save_path = "cnr_c60/vertex_images_json";
     string ply_save_path = "cnr_c60/ply_files";
-    string clip_feat_path = "cnr_c60/saved-feat";
+    string clip_feat_path = "cnr_c60/dinov2-saved-feat";
     string bin_path = "cnr_c60/concat_feats";
-    string path_to_features=dataset_path+"cnr_c60/saved-feat";
+    string path_to_features=dataset_path+clip_feat_path;
     int n_threads = 128; 
 
     create_directory_if_not_exists(dataset_path + ply_save_path);
@@ -36,10 +36,8 @@ int main(int argc, char* argv[])
     if (run_unit_test)
     {
         cout << "starting vertex_dic_build unit test" << endl;
-        projector.color_mesh_by_features(dataset_path+bin_path+"/rgb_feats/3_all_feats.png", dataset_path+bin_path+"/all_feats_fp_"+projector.getTimestamp()+".ply");
-        //projector.color_mesh_by_features(dataset_path+bin_path+"/133468485245652555_nz_colours.txt", dataset_path+bin_path+"/all_feats_c_"+projector.getTimestamp()+".ply", true);
-        //projector.color_mesh_by_features(dataset_path+bin_path+"/133468485245652555_allfeat_colours.txt", dataset_path+bin_path+"/all_feats_c_"+projector.getTimestamp()+".ply", true);
-        //projector.color_mesh_by_features(dataset_path+bin_path+"/133468485245652555_wz_colours.txt", dataset_path+bin_path+"/all_feats_c_"+projector.getTimestamp()+".ply", true);
+        projector.color_mesh_by_features(dataset_path+bin_path+"/rgb_feats/3_dinoV2_all_feats.png", dataset_path+bin_path+"/all_feats_fp_"+projector.getTimestamp()+".ply");
+        //projector.color_mesh_by_features(dataset_path+bin_path+"/rgb_feats/3_all_feats.png", dataset_path+bin_path+"/all_feats_fp_"+projector.getTimestamp()+".ply");
         
         //uncomment the following code to perform the unit tests
         /*
@@ -83,7 +81,7 @@ int main(int argc, char* argv[])
         map<long long, map<int, vector<vcg::Point2f>>> dict;
         projector.get_vetex_to_pixel_dict(dict, path_to_pv, path_to_depth_folder, clip_feat_path, json_save_path);
 
-        auto tensors = projector.make_tensors(dict, clip_feat_path, bin_path, true, false, true);
+        auto tensors = projector.make_tensors(dict, path_to_features, bin_path, true, false, true);
     }
 
     

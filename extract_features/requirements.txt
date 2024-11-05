@@ -1,0 +1,9 @@
+numpy
+matplotlib
+torch
+torchvision 
+tqdm
+imutils
+pillow
+opencv-python
+open3d
