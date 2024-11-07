@@ -70,23 +70,25 @@ class Test_feat{
     public:
         void color_map_by_features(Eigen::Tensor<float, 1>& feature, string similarity_metric = "cosine" , string path_to_save_mesh = "resources/cnr_c60/ply_files/", string mesh_filename="_similarity.ply", string json_file_name="_similarity.json"){
             
-            HandleMesh mesh_handle = HandleMesh(path_to_mesh, 1, false);
+            //HandleMesh mesh_handle = HandleMesh(path_to_mesh, 1, false);
             map<int, double> similarity_map;
             cout << "similaity metric is: " << similarity_metric << endl;
             
             calculate_similaity_metric(similarity_metric, similarity_map, feature, true, path_to_dataset+json_save_path);
             // Find min and max values in cosine_similarity_map in one pass
+            color_map_by_features(similarity_map, similarity_metric, path_to_save_mesh, mesh_filename, json_file_name);
+        }
+
+    public:
+        void color_map_by_features(map<int, double>& similarity_map, string similarity_metric = "cosine" , string path_to_save_mesh = "resources/cnr_c60/ply_files/", string mesh_filename="_similarity.ply", string json_file_name="_similarity.json"){
+            HandleMesh mesh_handle = HandleMesh(path_to_mesh, 1, false);
+            
             auto min_max = std::minmax_element(similarity_map.begin(), similarity_map.end(),
                                             [](const auto& a, const auto& b) { return a.second < b.second; });
             double min_value = min_max.first->second;
             double max_value = min_max.second->second;
             cout << "min_value " << min_value << " max_value " << max_value << endl;
             vcg::Color4b white(255, 255, 255, 0);
-            vcg::Color4b yellow(255, 255, 0, 0);
-            vcg::Color4b green(0, 255, 0, 0);
-            vcg::Color4b red(255, 0, 0, 0);
-            vcg::Color4b black(0, 0, 0, 0);
-            vcg::Color4b blue(0, 0, 255, 0);
             //set all vertex to color based on lower value 
             for(int i = 0; i < mesh_handle.mesh.vert.size(); i++){
                 mesh_handle.mesh.vert[i].C() = white;
@@ -99,24 +101,12 @@ class Test_feat{
             for(auto it = similarity_map.cbegin(); it != similarity_map.cend(); ++it){
                 int key = it->first;   
                 double value = it->second; 
-                //if(similarity_map[key] > threshold && similarity_map[key] < 1)
-                {
-                    // Normalize the cosine similarity value between 0 and 1
-                    double normalized_value = (value - min_value) / (max_value - min_value);
-                     // Apply alpha = 255 for full opacity
-                    mesh_handle.mesh.vert[key].C() = jetColorMap(normalized_value);
-                    //cout << "color at: "<<key<<" is "<< int(mesh_handle.mesh.vert[key].C()[0]) << " "<< int(mesh_handle.mesh.vert[key].C()[1]) << " " << int(mesh_handle.mesh.vert[key].C()[2]) << endl;
-                    
-                }          
-                //else
-                {
-                //    mesh_handle.mesh.vert[key].C() = white;
-                    //cout << "color at: "<<key<<" is "<< int(mesh_handle.mesh.vert[key].C()[0]) << " "<< int(mesh_handle.mesh.vert[key].C()[1]) << " " << int(mesh_handle.mesh.vert[key].C()[2]) << endl;
-                    
-                }     
+                // Normalize the cosine similarity value between 0 and 1
+                double normalized_value = (value - min_value) / (max_value - min_value);
+                mesh_handle.mesh.vert[key].C() = jetColorMap(normalized_value);
+                //cout << "color at: "<<key<<" is "<< int(mesh_handle.mesh.vert[key].C()[0]) << " "<< int(mesh_handle.mesh.vert[key].C()[1]) << " " << int(mesh_handle.mesh.vert[key].C()[2]) << endl;
             }
 
-            //mesh_handle.mesh.vert[1655584].C() = blue;
 
             cout<<" Saving mesh at: "<<path_to_save_mesh<<endl;
             if (!filesystem::exists(path_to_save_mesh)) {
@@ -137,18 +127,23 @@ class Test_feat{
 
     public: 
         void calculate_similaity_metric(string similarity_metric, map<int, double>& similarity_map,  Eigen::Tensor<float, 1>& query_feature, bool save_to_json=false, string save_path="./", bool l2_normalize_data = false){
+            calculate_similaity_metric(tensors, similarity_metric, similarity_map, query_feature, save_to_json, save_path, l2_normalize_data);            
+        }
+    
+    public: 
+        void calculate_similaity_metric(vector<Eigen::Tensor<float, 1>>& features, string similarity_metric, map<int, double>& similarity_map,  Eigen::Tensor<float, 1>& query_feature, bool save_to_json=false, string save_path="./", bool l2_normalize_data = false){
 
             cout<<"Calculating "<<similarity_metric<<" distance.. "<<endl;
             float done_similarity = 0;
-            cout<<" Calculated "<< (done_similarity/tensors.size())*100 << "% | "<<static_cast<int>(done_similarity)<<"/"<<tensors.size()<<"\r" << std::flush;             
+            cout<<" Calculated "<< (done_similarity/features.size())*100 << "% | "<<static_cast<int>(done_similarity)<<"/"<<tensors.size()<<"\r" << std::flush;             
             
             Eigen::Tensor<float, 1>& tensor_a = query_feature;
 
             if(l2_normalize_data)
                 projector.l2_normalization(tensor_a);
 
-            for(int i = 0; i < tensors.size(); i++){
-                Eigen::Tensor<float, 1>& tensor_b = tensors[i];
+            for(int i = 0; i < features.size(); i++){
+                Eigen::Tensor<float, 1>& tensor_b = features[i];
                 if (tensor_a.size() != tensor_b.size()){
                     cout<<"Tensors sizes mismatch, smaller tensor will be padded"<<endl;
 
@@ -185,10 +180,10 @@ class Test_feat{
                 }
                 done_similarity++;
 
-                if (static_cast<int>(done_similarity) % static_cast<int>(tensors.size()/12) == 0)
-                    cout<<" Calculated " << (done_similarity/tensors.size())*100 << "% | "<<static_cast<int>(done_similarity)<<"/"<<tensors.size()<<"\r" << std::flush;             
+                if (static_cast<int>(done_similarity) % static_cast<int>(features.size()/12) == 0)
+                    cout<<" Calculated " << (done_similarity/features.size())*100 << "% | "<<static_cast<int>(done_similarity)<<"/"<<features.size()<<"\r" << std::flush;             
             }
-            cout<<" Calculated " << (done_similarity/tensors.size())*100 << "% | "<<done_similarity<<"/"<<tensors.size()<<endl;             
+            cout<<" Calculated " << (done_similarity/features.size())*100 << "% | "<<done_similarity<<"/"<<features.size()<<endl;             
 
             if(save_to_json)
                 projector.map_to_json(similarity_map, save_path, similarity_metric+"_similarity_"+current_timestamp);
@@ -420,6 +415,78 @@ class Test_feat{
             // Return the final color with full opacity
             return vcg::Color4b(r, g, b, 255);
         }
+    
+    public:
+        void combine_clip_dino(vector<Eigen::Tensor<float, 1>>& clip_feat, vector<Eigen::Tensor<float, 1>>& dinoV2_feat, Eigen::Tensor<float, 1> query_feat, string similarity_metric = "cosine" , string path_to_save_mesh = "resources/cnr_c60/ply_files/", string mesh_filename="_similarity.ply", string json_file_name="_similarity.json", bool save_json = false){
+            /*
+                run clip on the prompt, 
+                take the n best result from clip and save the vertex indices,
+                run the n vertex index as prompts,
+                combine the n result in one final result taking the best similarity scores for each vertex 
+            */
 
+            HandleMesh mesh_handler = HandleMesh(path_to_mesh, 1, false);
+            map<int, double> similarity_map;
+            cout << "similaity metric is: " << similarity_metric << endl;
+            cout << " Clip phase" << endl;
+            calculate_similaity_metric(clip_feat, similarity_metric, similarity_map, query_feat, save_json, path_to_dataset+json_save_path);
+            auto min_max = std::minmax_element(similarity_map.begin(), similarity_map.end(),
+                                        [](const auto& a, const auto& b) { return a.second < b.second; });
+            double min_value = min_max.first->second;
+            double max_value = min_max.second->second;
+            /*           
+                i will probably have to make it better afterwards bu the ide is the following:
+                for each point, it it's similarity score is higher than threshold 
+                    check if value > base node value 
+                        basenode = current node
+                    else check if the euclidean distance from previous node is smaller than a given distance
+                    if distance higher that threshold distance take the point
+            */
+            cout << " Extracting best values..."<<endl;
+            float distance_threshold = 50.0;
+            vector<int> best_key;
+            for (const auto& [key, similarity_score] : similarity_map) {
+                if(similarity_score == max_value){
+                    if(best_key.size() == 0)
+                        best_key.push_back(key);
+                    else{
+                        vcg::Point3f current_point = mesh_handler.mesh.vert[key].P();
+                        for(int v = 0; v < best_key.size(); v++){
+                            vcg::Point3f previous_point = mesh_handler.mesh.vert[v].P();
+                            double distance = std::sqrt(std::pow(previous_point[0] - current_point[0], 2) + std::pow(previous_point[1] - current_point[1], 2) + std::pow(previous_point[2] - current_point[2], 2));
+                            if(distance > distance_threshold){
+                                best_key.push_back(key);        
+                            }
+                            if(v>100)
+                                break;
+                        }
+                    }
+                }
+            }
+            
+            cout << " keys found " << best_key.size() << endl;
+            //now that we have the best vertexes by id, we make the similarity metric and merge the result
+            cout << " DinoV2 phase..."<<endl;
+            map<int, double> dinoV2_similarity;
+            
+            if(best_key.size()>1){
+                map<int, double> temp_similarity;
+                for(int g = 0; g < best_key.size(); g++){
+                    calculate_similaity_metric(dinoV2_feat, similarity_metric, temp_similarity, dinoV2_feat[best_key[g]], save_json, path_to_dataset+json_save_path);
+                    if(g == 0)
+                        dinoV2_similarity = temp_similarity;
+                    else{
+                        for (const auto& [key, value] : dinoV2_similarity){
+                            dinoV2_similarity[key] = std::max(temp_similarity[key], value);
+                        }
+                    }
+                }
+            }
+            else{
+                calculate_similaity_metric(dinoV2_feat, similarity_metric, dinoV2_similarity, dinoV2_feat[best_key[0]], true, path_to_dataset+json_save_path);
+            }
 
+            cout << "Coloring and saving the mesh as: "<< mesh_filename << endl;
+            color_map_by_features(dinoV2_similarity, similarity_metric, path_to_save_mesh, mesh_filename, json_file_name);
+        }
 };
